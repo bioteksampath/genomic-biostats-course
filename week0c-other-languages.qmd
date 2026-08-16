@@ -1,0 +1,73 @@
+---
+title: "Week 0c — Python, Bash, and SQL"
+subtitle: "Where each language appears in this course, and when to reach for it"
+---
+
+```{mermaid}
+flowchart TD
+    R[R — statistics, models, plots, Shiny<br/>Weeks 1–7] --- P[Python — scikit-learn, MOFA backend, Snakemake<br/>Weeks 4 · 5 · 8]
+    R --- B[Bash/Linux — files, SLURM<br/>Week 8]
+    R --- S[SQL — relational queries<br/>Week 7]
+```
+
+## R vs Python — the honest answer
+
+| Task | Reach for |
+|---|---|
+| Mixed models, quantitative genetics, GWAS/GS | **R** (sommer, BGLR, rrBLUP — unmatched) |
+| Publication figures, interactive apps | **R** (ggplot2, Shiny) |
+| Deep learning, large-scale ML engineering | **Python** (scikit-learn, PyTorch) |
+| Workflow orchestration on clusters | **Python-adjacent** (Snakemake, Nextflow) |
+| Sequence wrangling at scale | **Bash + compiled tools** (samtools, bcftools) |
+
+In a biostatistics role you will live in R and *read* Python. This course mirrors that.
+
+## Python in 15 lines (Week 4 preview)
+
+```python
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import cross_val_score
+
+X = pd.read_csv("data/wheat_markers.csv")     # lines x SNPs
+y = pd.read_csv("data/wheat_pheno.csv")["yield"]
+
+rf = RandomForestRegressor(n_estimators=500, n_jobs=-1, random_state=1)
+print(cross_val_score(rf, X, y, cv=5, scoring="r2").mean())
+```
+
+Same logic as R's `ranger` — different dialect.
+
+## Bash you actually need
+
+```bash
+wc -l genotypes.vcf                    # how big is it
+grep -v "^#" genotypes.vcf | head     # skip VCF header
+cut -f1,2,4,5 snps.tsv | sort | uniq -c
+awk '$5 > 0.05' maf.txt > common_snps.txt
+```
+
+Plus a SLURM template (Week 8):
+
+```bash
+#!/bin/bash
+#SBATCH --job-name=gs_cv --array=1-25
+#SBATCH --cpus-per-task=4 --mem=16G --time=02:00:00
+Rscript R/run_fold.R ${SLURM_ARRAY_TASK_ID}
+```
+
+## SQL in four verbs (Week 7 preview)
+
+```sql
+SELECT trait, marker, pvalue
+FROM gwas_results
+WHERE pvalue < 1e-6
+ORDER BY pvalue
+LIMIT 20;
+```
+
+`SELECT`–`FROM`–`WHERE`–`JOIN` cover most real use; Week 7 builds a breeding database and queries it from R.
+
+## Exercise
+
+Install the conda environment from [Setup](../setup.qmd), open JupyterLab, and run the Python snippet above on any CSV you have. Note what felt familiar from R.

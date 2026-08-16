@@ -1,0 +1,97 @@
+---
+title: "Week 8 — HPC & Reproducible Pipelines"
+subtitle: "SLURM, Snakemake, and containers: analysis that scales and repeats"
+---
+
+```{mermaid}
+flowchart LR
+    A[Parallel R<br/>future/furrr] --> B[SLURM<br/>job arrays]
+    B --> C[Snakemake<br/>rule DAG · resume]
+    C --> D[Containers<br/>Apptainer/Docker]
+    D --> E[The reproducibility<br/>stack, assembled]
+```
+
+## 1. Parallel inside one machine
+
+```{r}
+#| eval: false
+library(future); library(furrr)
+plan(multisession, workers = 4)
+acc <- future_map_dbl(1:20, \(rep) run_one_cv_rep(rep), .options = furrr_options(seed = TRUE))
+```
+
+Twenty CV repeats on 4 cores — the gateway drug to real parallelism.
+
+## 2. SLURM: the cluster's job manager
+
+`jobs/gs_cv.sh`:
+
+```bash
+#!/bin/bash
+#SBATCH --job-name=gs_cv
+#SBATCH --array=1-25            # 5 folds x 5 models
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=16G
+#SBATCH --time=02:00:00
+#SBATCH --output=logs/%x_%a.out
+
+module load r/4.3
+Rscript R/run_fold.R "${SLURM_ARRAY_TASK_ID}"
+```
+
+**Job arrays** turn CV folds, chromosomes, or traits into embarrassingly parallel tasks — one script, 25 jobs, one line to submit (`sbatch jobs/gs_cv.sh`).
+
+## 3. Snakemake: the pipeline as a DAG
+
+`Snakefile` (shipped in the repo):
+
+```python
+MODELS = ["ridge", "bayesb", "rf", "xgb"]
+FOLDS  = range(1, 6)
+
+rule all:
+    input: "results/benchmark_report.html"
+
+rule prep:
+    output: "data/wheat_ready.rds"
+    script: "R/prep_wheat.R"
+
+rule cv_fold:
+    input:  "data/wheat_ready.rds"
+    output: "results/{model}_fold{fold}.rds"
+    script: "R/run_fold_snake.R"
+
+rule aggregate:
+    input:  expand("results/{model}_fold{fold}.rds", model=MODELS, fold=FOLDS)
+    output: "results/benchmark.csv"
+    script: "R/aggregate.R"
+
+rule report:
+    input:  "results/benchmark.csv"
+    output: "results/benchmark_report.html"
+    shell:  "quarto render report/benchmark.qmd --output-dir ../results"
+```
+
+Snakemake infers the dependency graph from filenames, runs independent rules **in parallel**, and after a crash **resumes exactly where it stopped**. `snakemake --executor slurm -j 25` dispatches rules as SLURM jobs.
+
+## 4. Containers: freeze the environment
+
+```bash
+apptainer pull course.sif docker://rocker/verse:4.3.2
+apptainer exec course.sif Rscript R/run_fold.R 1
+```
+
+Same image on your laptop, the cluster, and a reviewer's machine three years from now.
+
+## 5. The reproducibility stack — the interview answer
+
+> Code versioned in **Git** → packages pinned with **renv/conda** → environment frozen in a **container** → steps orchestrated by a **workflow manager** → seeds set → rendered **Quarto** report. Anyone can rerun everything with one command.
+
+That paragraph, delivered confidently, answers "how do you ensure reproducibility?" completely.
+
+## Exercises
+
+1. Convert Week 4's benchmark into the Snakefile above (R scripts templated in `R/`).
+2. Add a `--configfile` with trait choice; rerun for a second trait — note what Snakemake *doesn't* recompute.
+3. Wrap the pipeline in the rocker container and rerun.
+4. Capstone: link the final `benchmark.csv` into the Week 6 app and the Week 7 database — the full loop: **pipeline → database → API → app**.

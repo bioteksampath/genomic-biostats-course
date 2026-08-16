@@ -1,0 +1,100 @@
+---
+title: "Week 3 — Bayesian Inference & Genomic Prediction"
+subtitle: "MCMC and the Bayesian alphabet on the classic CIMMYT wheat data"
+---
+
+```{mermaid}
+flowchart LR
+    A[Bayes theorem<br/>prior × likelihood] --> B[MCMC<br/>Gibbs sampling]
+    B --> C[Diagnostics<br/>trace · R-hat · ESS]
+    C --> D[Bayesian alphabet<br/>BRR · BayesA/B/C · BL]
+    D --> E[Cross-validated<br/>prediction accuracy]
+```
+
+**Dataset:** `BGLR::wheat` — 599 CIMMYT wheat lines, 1,279 DArT markers, grain yield in 4 environments (Crossa et al. 2010). *The* benchmark genomic-selection dataset.
+
+## 1. Bayes in one paragraph
+
+Posterior ∝ likelihood × prior. Priors are regularization with a probability interpretation: a Normal prior on marker effects **is** ridge/GBLUP; a Laplace prior **is** the LASSO; mixture priors (BayesB/C) say "most markers do nothing." With n ≪ p, the prior is not optional — every GS method is a prior choice.
+
+## 2. Load the classic data
+
+```{r}
+library(BGLR); library(tidyverse); library(coda)
+data(wheat)
+X <- scale(wheat.X)          # 599 x 1279 markers
+y <- wheat.Y[, 1]            # yield, environment 1
+dim(X)
+```
+
+## 3. Fit Bayesian Ridge and BayesB
+
+```{r}
+#| results: hide
+set.seed(7)
+dir.create("bglr_tmp", showWarnings = FALSE)
+fit_brr <- BGLR(y = y, ETA = list(mrk = list(X = X, model = "BRR")),
+                nIter = 6000, burnIn = 1000, saveAt = "bglr_tmp/brr_", verbose = FALSE)
+fit_bb  <- BGLR(y = y, ETA = list(mrk = list(X = X, model = "BayesB")),
+                nIter = 6000, burnIn = 1000, saveAt = "bglr_tmp/bb_",  verbose = FALSE)
+```
+
+(6k iterations keeps the page fast; use 30k+ with 5k burn-in for real work.)
+
+## 4. Did the chain converge? Always check
+
+```{r}
+#| fig-height: 3
+varE <- scan("bglr_tmp/brr_varE.dat", quiet = TRUE)
+plot(varE, type = "l", main = "Trace: residual variance (BRR)", ylab = "varE")
+effectiveSize(mcmc(varE))
+```
+
+A "fuzzy caterpillar" trace, effective sample size in the hundreds, and (with multiple chains) R-hat ≈ 1.00 — say these three things in an interview and you've answered the MCMC question.
+
+## 5. Where the models disagree: marker effects
+
+```{r}
+#| fig-height: 3.2
+tibble(marker = 1:ncol(X),
+       BRR    = abs(fit_brr$ETA$mrk$b),
+       BayesB = abs(fit_bb$ETA$mrk$b)) |>
+  pivot_longer(-marker) |>
+  ggplot(aes(marker, value)) + geom_point(size = .4, alpha = .5) +
+  facet_wrap(~name) + theme_minimal() +
+  labs(y = "|marker effect|", title = "Shrink-everything vs select-few priors")
+```
+
+BRR spreads small effects everywhere; BayesB concentrates signal — matching infinitesimal vs oligogenic architectures.
+
+## 6. The only score that matters: predictive ability
+
+```{r}
+#| results: hide
+set.seed(42)
+folds <- sample(rep(1:5, length.out = length(y)))
+acc <- map_dfr(1:5, function(k) {
+  yNA <- y; yNA[folds == k] <- NA
+  f1 <- BGLR(yNA, ETA = list(m = list(X = X, model = "BRR")),
+             nIter = 6000, burnIn = 1000, saveAt = "bglr_tmp/cv1_", verbose = FALSE)
+  f2 <- BGLR(yNA, ETA = list(m = list(X = X, model = "BayesB")),
+             nIter = 6000, burnIn = 1000, saveAt = "bglr_tmp/cv2_", verbose = FALSE)
+  tibble(fold = k,
+         BRR    = cor(f1$yHat[folds == k], y[folds == k]),
+         BayesB = cor(f2$yHat[folds == k], y[folds == k]))
+})
+```
+
+```{r}
+acc |> summarise(across(BRR:BayesB, mean)) |> round(3)
+```
+
+On polygenic wheat yield the two typically tie — *that result is the lesson*: architecture determines the winner, so benchmark on your trait, don't assume.
+
+## Exercises
+
+1. Add `model = "BL"` (Bayesian LASSO) to the CV loop.
+2. Predict environment 2 (`wheat.Y[,2]`) from models trained on environment 1 — what does the accuracy drop tell you about GxE?
+3. Increase nIter to 30k for BayesB; do the top-10 markers change?
+
+**Data credit:** Crossa et al. (2010) *Genetics*; distributed with BGLR (Pérez & de los Campos 2014).

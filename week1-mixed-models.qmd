@@ -1,0 +1,105 @@
+---
+title: "Week 1 — Linear & Mixed Models"
+subtitle: "From ANOVA to spatial mixed models on real prairie trials"
+---
+
+```{mermaid}
+flowchart LR
+    A[Linear model<br/>y = Xβ + e] --> B[GLM<br/>logistic · counts]
+    B --> C[Mixed model<br/>y = Xβ + Zu + e]
+    C --> D[BLUE vs BLUP<br/>shrinkage & h²]
+    D --> E[Spatial models<br/>AR1×AR1 on field trials]
+```
+
+**Dataset:** `agridat::gilmour.serpentine` — a real South Australian wheat trial (Gilmour et al. 1997), the canonical spatial-analysis teaching set, plus Yates' oats for the split-plot classic.
+
+## 1. The linear model
+
+```{r}
+library(tidyverse); library(agridat); library(lme4); library(emmeans)
+data(oats)
+lm1 <- lm(yield ~ gen + factor(nitro), data = oats)
+anova(lm1)
+```
+
+Fixed effects, F-tests — the machinery beneath every ANOVA table you've published.
+
+## 2. GLMs in one chunk
+
+```{r}
+# Binomial GLM: disease incidence example (simulated scores on real structure)
+set.seed(2)
+oats$diseased <- rbinom(nrow(oats), 10, plogis(-1 + 0.02 * scale(oats$yield)))
+glm1 <- glm(cbind(diseased, 10 - diseased) ~ gen, family = binomial, data = oats)
+summary(glm1)$coefficients |> head(3)
+```
+
+The same idea powers RNA-seq DE (negative-binomial GLM — Week 5).
+
+## 3. The mixed model: y = Xβ + Zu + e
+
+Blocks and genotypes become **random effects**: they share a distribution, so estimates *borrow strength* and shrink toward the mean.
+
+```{r}
+mm1 <- lmer(yield ~ factor(nitro) + (1 | gen) + (1 | block), data = oats)
+summary(mm1)$varcor
+```
+
+**Heritability from variance components** (line-mean basis):
+
+```{r}
+vc <- as.data.frame(VarCorr(mm1))
+Vg <- vc$vcov[vc$grp == "gen"]; Ve <- vc$vcov[vc$grp == "Residual"]
+h2 <- Vg / (Vg + Ve / 3)        # 3 blocks
+round(h2, 2)
+```
+
+**BLUP shrinkage, visualized:**
+
+```{r}
+#| fig-height: 3
+blup <- ranef(mm1)$gen[,1]
+blue <- coef(lm(yield ~ gen - 1, oats)) - mean(oats$yield)
+tibble(line = names(blup), BLUE = as.numeric(blue), BLUP = blup) |>
+  pivot_longer(-line) |>
+  ggplot(aes(value, line, colour = name)) + geom_point(size = 3) +
+  labs(x = "Deviation from mean", colour = NULL) + theme_minimal()
+```
+
+BLUPs sit closer to zero — shrinkage in proportion to reliability. This *is* what genomic BLUP does with markers.
+
+## 4. Spatial analysis of a real field trial
+
+```{r}
+library(sommer)
+data(gilmour.serpentine)
+g <- gilmour.serpentine |> mutate(R = as.numeric(row), C = as.numeric(col))
+
+m_base <- mmer(yield ~ 1, random = ~ gen, data = g, verbose = FALSE)
+m_spat <- mmer(yield ~ 1,
+               random = ~ gen + spl2Da(C, R),
+               data = g, verbose = FALSE)
+c(base = m_base$AIC, spatial = m_spat$AIC)
+```
+
+The spatial spline soaks up field trend; genotype variance is estimated more cleanly and rankings change — decisions change.
+
+```{r}
+#| fig-height: 3.2
+ggplot(g, aes(C, R, fill = yield)) + geom_tile() +
+  scale_fill_viridis_c() + labs(title = "Raw field trend — why we model space") +
+  theme_minimal()
+```
+
+## Interview-grade summary
+
+- Random vs fixed: *"Random effects share a distribution; I model genotypes as random to get shrunken BLUPs and variance components for heritability."*
+- Spatial: *"AR1×AR1 or 2-D splines model field trend; ignoring it inflates error and mis-ranks lines."*
+
+## Exercises
+
+1. Refit `m_spat` with row and column as additional random factors; compare AIC.
+2. Compute h² from `m_spat` variance components (`vpredict`).
+3. In Yates' oats, treat nitrogen as numeric and fit a quadratic response — is the linear model adequate?
+
+**Data credits:** Gilmour et al. (1997) *JABES*; Yates (1935), via the `agridat` package (Kevin Wright).

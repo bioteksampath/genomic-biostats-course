@@ -1,0 +1,89 @@
+---
+title: "Week 4 — Machine Learning for Genomic Prediction"
+subtitle: "Penalized regression, random forests, and boosting — mechanics first"
+---
+
+```{mermaid}
+flowchart LR
+    A[Bias–variance<br/>tradeoff] --> B[Honest CV<br/>random vs grouped]
+    B --> C[Penalized regression<br/>ridge=GBLUP · LASSO · enet]
+    C --> D[Random Forest<br/>bagging + decorrelation]
+    D --> E[Gradient boosting<br/>sequential residual fitting]
+    E --> F[Benchmark table<br/>+ variable importance]
+```
+
+**Datasets:** `BGLR::wheat` (599 CIMMYT lines) and `sommer::DT_technow` (real maize hybrids, Technow et al. 2014) — wheat + a Canadian-relevant maize hybrid-prediction problem.
+
+## 1. Mechanics in plain language
+
+- **Ridge (L2):** shrink all coefficients; never zero. On markers, ridge regression **is** RR-BLUP **is** GBLUP — one model, three names. Memorize that identity.
+- **LASSO (L1):** shrink and *select* (some effects exactly zero). Struggles when SNPs are in LD — it picks one of a correlated set arbitrarily.
+- **Elastic net:** blend of both; the practical default for marker data.
+- **Random forest:** hundreds of trees, each on a bootstrap sample, each split limited to `mtry` random features. Averaging decorrelated trees slashes variance; out-of-bag samples give free validation; interactions/epistasis are captured without being specified.
+- **Gradient boosting:** trees fit **sequentially to residuals** of the ensemble so far; a small learning rate takes many careful steps. Strongest on tabular data, most tuning-sensitive.
+
+## 2. Honest cross-validation
+
+Random k-fold **leaks family information** in structured populations — relatives end up in train and test, inflating accuracy. Use grouped CV (leave-family/environment-out) matched to deployment. Saying this unprompted is a senior-analyst signal.
+
+## 3. Benchmark on wheat
+
+```{r}
+library(tidyverse); library(glmnet); library(ranger); library(xgboost); library(BGLR)
+data(wheat); X <- scale(wheat.X); y <- wheat.Y[,1]
+set.seed(42); folds <- sample(rep(1:5, length.out = length(y)))
+
+bench <- map_dfr(1:5, function(k) {
+  tr <- folds != k; te <- !tr
+  # ridge & lasso (CV-tuned lambda inside training folds only)
+  rid <- cv.glmnet(X[tr,], y[tr], alpha = 0)
+  las <- cv.glmnet(X[tr,], y[tr], alpha = 1)
+  # random forest
+  rf  <- ranger(y = y[tr], x = as.data.frame(X[tr,]), num.trees = 500, seed = 1)
+  # xgboost
+  xgb <- xgboost(data = X[tr,], label = y[tr], nrounds = 300, eta = 0.05,
+                 max_depth = 4, subsample = .8, verbose = 0)
+  tibble(fold = k,
+    Ridge  = cor(predict(rid, X[te,], s = "lambda.min"), y[te]),
+    LASSO  = cor(predict(las, X[te,], s = "lambda.min"), y[te]),
+    RF     = cor(predict(rf, as.data.frame(X[te,]))$predictions, y[te]),
+    XGB    = cor(predict(xgb, X[te,]), y[te]))
+})
+bench |> summarise(across(-fold, \(x) round(mean(x), 3)))
+```
+
+Typical outcome: ridge ≈ or > the fancy learners on polygenic yield. **Additive, small-effect traits are ridge's home turf** — the honest conclusion most papers bury.
+
+## 4. Which markers drive the forest?
+
+```{r}
+#| fig-height: 3
+rf_all <- ranger(y = y, x = as.data.frame(X), num.trees = 800,
+                 importance = "permutation", seed = 1)
+enframe(sort(rf_all$variable.importance, decreasing = TRUE)[1:20]) |>
+  ggplot(aes(reorder(name, value), value)) + geom_col(fill = "#159957") +
+  coord_flip() + theme_minimal() + labs(x = NULL, y = "Permutation importance")
+```
+
+Compare these to single-marker GWAS hits — overlap validates; RF-only hits hint at interactions.
+
+## 5. Maize hybrids: grouped CV done right
+
+```{r}
+#| eval: false
+library(sommer); data(DT_technow)
+# Predict *untested* hybrids: leave-one-dent-family-out CV.
+# Template: group folds by DT_technow$dent parent, refit ridge vs XGB,
+# and compare against random CV — expect a sobering accuracy drop.
+```
+
+(Left as the week's main exercise — the accuracy gap between random and grouped CV is the single most instructive number in applied GS.)
+
+## Exercises
+
+1. Complete the Technow grouped-CV comparison; report random-CV vs leave-family-out accuracy for ridge and XGBoost.
+2. Tune `mtry` for ranger via OOB error; how sensitive is accuracy?
+3. Fit elastic net (`alpha = 0.5`); does it beat both parents?
+4. (Python) Reproduce the ridge benchmark in scikit-learn — compare wall-clock time.
+
+**Data credits:** Crossa et al. 2010 (BGLR); Technow et al. 2014 *Genetics* (sommer).

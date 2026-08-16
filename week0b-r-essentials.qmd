@@ -1,0 +1,86 @@
+---
+title: "Week 0b — R Essentials"
+subtitle: "Just enough R to be dangerous, in one sitting"
+---
+
+```{mermaid}
+flowchart LR
+    A[Projects &<br/>working directory] --> B[Vectors &<br/>data frames]
+    B --> C[tidyverse verbs<br/>filter · mutate · summarise]
+    C --> D[ggplot2<br/>grammar of graphics]
+    D --> E[Functions &<br/>reading genomic files]
+    E --> F[Quarto<br/>reports]
+```
+
+## Projects and paths
+
+Always work inside an **RStudio Project** (`.Rproj`) and build paths with `here::here()` — scripts then run on any machine, which is half of reproducibility.
+
+## Vectors and data frames
+
+```{r}
+yield  <- c(42.1, 39.8, 45.3, 41.0)          # numeric vector
+line   <- c("L1", "L2", "L3", "L4")
+trial  <- data.frame(line, yield)
+trial$yield_kg <- trial$yield * 67.25         # bu/ac -> kg/ha (canola)
+trial
+```
+
+## The six tidyverse verbs that do 90% of work
+
+```{r}
+library(tidyverse)
+data(oats, package = "agridat")   # a real 1930s split-plot oat trial (Yates)
+glimpse(oats)
+
+oats |>
+  filter(nitro > 0) |>
+  mutate(yield_t = yield * 0.0251) |>
+  group_by(gen, nitro) |>
+  summarise(mean_yield = mean(yield), .groups = "drop") |>
+  arrange(desc(mean_yield)) |>
+  head()
+```
+
+`filter` rows · `select` columns · `mutate` new variables · `group_by`+`summarise` aggregate · `arrange` sort · `left_join` merge (genotype ↔ phenotype tables).
+
+## ggplot2: plots as grammar
+
+```{r}
+#| fig-height: 3.5
+ggplot(oats, aes(x = factor(nitro), y = yield, fill = gen)) +
+  geom_boxplot() +
+  labs(x = "Nitrogen (cwt/ac)", y = "Yield", fill = "Genotype",
+       title = "Yates (1935) oat trial") +
+  theme_minimal()
+```
+
+Aesthetics map data → visual channels; geoms draw; facets split. Every figure in this course is built this way.
+
+## Reading genomic-style files
+
+```{r}
+#| eval: false
+pheno <- read_csv("data/phenotypes.csv")
+geno  <- read_tsv("data/genotypes.hmp.txt")          # HapMap
+vcf   <- vcfR::read.vcfR("data/snps.vcf.gz")         # VCF
+```
+
+## Writing functions
+
+```{r}
+cv <- function(x) 100 * sd(x, na.rm = TRUE) / mean(x, na.rm = TRUE)
+cv(oats$yield)
+```
+
+If you paste code three times, it should be a function; if a function is used in three scripts, it belongs in `R/helpers.R`.
+
+## Quarto
+
+This entire website is Quarto: prose + chunks + output in one `.qmd`. Render with the **Render** button or `quarto render`. Your analyses become reports automatically — this is the reporting standard the course assumes.
+
+## Exercises
+
+1. With `agridat::oats`, compute the CV of yield per genotype.
+2. Plot yield vs nitrogen as points + a loess smooth, faceted by genotype.
+3. Write `standardize <- function(x)` returning z-scores; apply it to yield within each block using `group_by() |> mutate()`.

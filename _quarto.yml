@@ -1,0 +1,56 @@
+project:
+  type: website
+  output-dir: _site
+
+website:
+  title: "Genomic Biostatistics"
+  description: "Applied Biostatistics & Machine Learning for Crop Genomics — an 8-week hands-on course"
+  site-url: https://sampathperumal.github.io/genomic-biostats-course
+  repo-url: https://github.com/sampathperumal/genomic-biostats-course
+  navbar:
+    background: "#f8f9fa"
+    search: true
+    left:
+      - href: index.qmd
+        text: Home
+      - href: setup.qmd
+        text: Setup
+      - text: "Weeks 0–2"
+        menu:
+          - weeks/week0a-biostats-primer.qmd
+          - weeks/week0b-r-essentials.qmd
+          - weeks/week0c-other-languages.qmd
+          - weeks/week1-mixed-models.qmd
+          - weeks/week2-multivariate.qmd
+      - text: "Weeks 3–5"
+        menu:
+          - weeks/week3-bayesian.qmd
+          - weeks/week4-machine-learning.qmd
+          - weeks/week5-multiomics.qmd
+      - text: "Weeks 6–8"
+        menu:
+          - weeks/week6-shiny-apps.qmd
+          - weeks/week7-databases-apis.qmd
+          - weeks/week8-hpc-pipelines.qmd
+    right:
+      - icon: github
+        href: https://github.com/sampathperumal/genomic-biostats-course
+  page-footer:
+    center: "© 2026 Sampath Perumal · NRC Saskatoon · Built with Quarto"
+
+format:
+  html:
+    theme: [cosmo, styles.scss]
+    toc: true
+    toc-depth: 3
+    code-fold: show
+    code-tools: true
+    code-copy: true
+    number-sections: true
+
+execute:
+  freeze: auto
+  warning: false
+  message: false
+
+author: "Sampath Perumal"

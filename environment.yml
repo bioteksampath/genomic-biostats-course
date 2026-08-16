@@ -1,0 +1,16 @@
+# Python environment for Weeks 4, 5, 8
+# Usage: conda env create -f setup/environment.yml && conda activate biostats-course
+name: biostats-course
+channels: [conda-forge, bioconda]
+dependencies:
+  - python=3.11
+  - numpy
+  - pandas
+  - scikit-learn
+  - matplotlib
+  - seaborn
+  - jupyterlab
+  - snakemake-minimal
+  - pip
+  - pip:
+      - mofapy2

@@ -1,0 +1,12 @@
+_site/
+_freeze/
+.quarto/
+bglr_tmp/
+*.dat
+course.db
+rsconnect/
+.Rproj.user
+.Rhistory
+.RData
+logs/
+results/

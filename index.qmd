@@ -1,0 +1,60 @@
+---
+title: "Applied Biostatistics & Machine Learning for Crop Genomics"
+subtitle: "An 8-week hands-on course with real canola, wheat, pea, and maize data"
+author: "Sampath Perumal, PhD — National Research Council of Canada, Saskatoon"
+---
+
+## Welcome
+
+This course teaches the statistical foundations behind modern crop genomics — mixed models, multivariate statistics, Bayesian inference, machine learning, multi-omics integration — and the delivery skills that turn analysis into tools: interactive web apps, databases, and HPC pipelines.
+
+Every module runs on **real, public datasets** from crops that matter to Canadian agriculture: prairie yield trials, CIMMYT wheat, pea diversity panels, canola RNA-seq, and maize hybrids.
+
+::: {.callout-note}
+## Who this is for
+Bioinformaticians and geneticists who *use* statistics daily and want to understand **how the methods actually work** — and statisticians who want realistic genomic case studies.
+:::
+
+## Course map
+
+```{mermaid}
+flowchart TD
+    A[Week 0<br/>Biostats primer · R · Python/Bash/SQL] --> B[Week 1<br/>Linear & Mixed Models<br/><i>prairie yield trials</i>]
+    B --> C[Week 2<br/>Multivariate & Dimension Reduction<br/><i>pea diversity</i>]
+    C --> D[Week 3<br/>Bayesian Inference<br/><i>CIMMYT wheat</i>]
+    D --> E[Week 4<br/>Machine Learning<br/><i>wheat + maize hybrids</i>]
+    E --> F[Week 5<br/>RNA-seq & Multi-omics<br/><i>canola</i>]
+    F --> G[Week 6<br/>Shiny Web Apps]
+    G --> H[Week 7<br/>Databases & APIs]
+    H --> I[Week 8<br/>HPC & Reproducible Pipelines]
+    style A fill:#e8f5e9
+    style I fill:#e3f2fd
+```
+
+## Weekly outline
+
+| Week | Topic | Dataset | Key packages |
+|---|---|---|---|
+| 0 | Biostatistics, R, and friends | — | tidyverse |
+| 1 | Linear & mixed models, spatial trials | `agridat` prairie trials | sommer, lme4 |
+| 2 | PCA, PLS-DA, clustering | Pea GWAS panel | mixOmics, FactoMineR |
+| 3 | Bayesian regression & MCMC | `BGLR::wheat` (CIMMYT) | BGLR, coda |
+| 4 | Penalized regression, RF, boosting | wheat + `DT_technow` maize | tidymodels, xgboost |
+| 5 | RNA-seq DE, WGCNA, MOFA2 | Canola GEO counts | DESeq2, MOFA2 |
+| 6 | Interactive apps | Weeks 2–4 outputs | shiny, plotly |
+| 7 | SQL & REST APIs | Weeks 2–4 outputs | RSQLite, plumber |
+| 8 | SLURM, Snakemake, containers | Week 4 pipeline | snakemake |
+
+## How to use this course
+
+1. Complete [Setup](setup.qmd) — one command installs everything.
+2. Work each week's page top-to-bottom; every page ends with exercises.
+3. Each `.qmd` is downloadable (code button, top right) to run locally.
+
+## Author
+
+**Sampath Perumal, PhD** — Research Associate, NRC Saskatoon. Plant genomics and predictive breeding: *Nature Plants* (2020), *The Plant Genome* (2025), 40 publications across canola, wheat, pea, and forage genomics. [Scholar](https://scholar.google.com/citations?user=JOuANlIAAAAJ) · [Homepage](https://sampathperumal.github.io)
+
+## License & citation
+
+Content: CC BY 4.0 · Code: MIT. Cite via [CITATION.cff](https://github.com/sampathperumal/genomic-biostats-course/blob/main/CITATION.cff). All datasets belong to their original authors and are credited on each page.

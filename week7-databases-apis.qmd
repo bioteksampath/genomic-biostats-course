@@ -1,0 +1,96 @@
+---
+title: "Week 7 — Databases & APIs for Breeding Data"
+subtitle: "From flat files to a queryable, serveable resource"
+---
+
+```{mermaid}
+flowchart LR
+    A[Relational model<br/>lines · markers · phenotypes] --> B[SQLite<br/>create & load]
+    B --> C[SQL verbs<br/>SELECT · JOIN · GROUP BY]
+    C --> D[dbplyr<br/>dplyr → SQL]
+    D --> E[plumber API<br/>GET /gwas?trait=...]
+```
+
+## 1. Why a database beats 40 CSVs
+
+One authoritative copy, enforced types and keys, concurrent access, and queries that don't require loading 2 GB into RAM. The mental model: **one table per entity**, keys linking them.
+
+```
+lines(line_id, name, family, origin)
+phenotypes(line_id, trait, env, value)
+gwas_results(trait, marker, chr, pos, pvalue)
+```
+
+## 2. Build it in R (fully reproducible)
+
+```{r}
+library(DBI); library(RSQLite); library(dplyr)
+con <- dbConnect(SQLite(), "course.db")
+
+set.seed(3)
+lines <- tibble(line_id = 1:200, name = paste0("L", 1:200),
+                family = sample(paste0("F", 1:10), 200, TRUE))
+phenos <- tidyr::expand_grid(line_id = 1:200, trait = c("Yield","Oil"),
+                             env = c("Saskatoon","Melfort")) |>
+  mutate(value = rnorm(n(), 50, 8))
+dbWriteTable(con, "lines", lines, overwrite = TRUE)
+dbWriteTable(con, "phenotypes", phenos, overwrite = TRUE)
+dbListTables(con)
+```
+
+## 3. SQL you'll actually write
+
+```{r}
+dbGetQuery(con, "
+  SELECT l.family, p.trait, ROUND(AVG(p.value),1) AS mean_val, COUNT(*) AS n
+  FROM phenotypes p JOIN lines l USING(line_id)
+  WHERE p.env = 'Saskatoon'
+  GROUP BY l.family, p.trait
+  ORDER BY mean_val DESC LIMIT 6")
+```
+
+## 4. Or let dbplyr write the SQL
+
+```{r}
+tbl(con, "phenotypes") |>
+  left_join(tbl(con, "lines"), by = "line_id") |>
+  group_by(family, trait) |>
+  summarise(mean_val = mean(value), .groups = "drop") |>
+  show_query()
+```
+
+Same dplyr verbs as Week 0b — translated to SQL and executed *in* the database.
+
+```{r}
+#| include: false
+dbDisconnect(con)
+```
+
+## 5. Serve it: a REST API in 20 lines
+
+`api/plumber.R`:
+
+```{r}
+#| eval: false
+library(plumber); library(DBI); library(RSQLite)
+
+#* @apiTitle Breeding data API — Sampath Perumal
+
+#* Mean phenotype by family
+#* @param trait Trait name
+#* @get /summary
+function(trait = "Yield") {
+  con <- dbConnect(SQLite(), "course.db"); on.exit(dbDisconnect(con))
+  dbGetQuery(con, "SELECT l.family, AVG(p.value) AS mean_val
+                   FROM phenotypes p JOIN lines l USING(line_id)
+                   WHERE p.trait = ? GROUP BY l.family", params = list(trait))
+}
+```
+
+Run: `plumber::plumb("api/plumber.R")$run(port = 8000)` → `http://localhost:8000/summary?trait=Oil` returns JSON. Your Week 6 Shiny app, a Python script, and a collaborator's browser all consume the **same endpoint** — that's the architecture sentence worth saying in interviews.
+
+## Exercises
+
+1. Add a `gwas_results` table from Week 3/4 output; write a query returning the top 10 markers per trait (window function: `ROW_NUMBER() OVER (PARTITION BY trait ORDER BY pvalue)`).
+2. Add a `/gwas` endpoint with a p-value filter parameter.
+3. Point the Week 6 app at the database via `pool` + `DBI` instead of RDS files.

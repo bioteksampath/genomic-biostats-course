@@ -1,0 +1,85 @@
+---
+title: "Week 6 — Interactive Web Applications with Shiny"
+subtitle: "From analysis to a deployed tool collaborators can click"
+---
+
+```{mermaid}
+flowchart LR
+    A[UI + server<br/>anatomy] --> B[Reactivity<br/>dependency graph]
+    B --> C[Manhattan + GS<br/>explorer app]
+    C --> D[Deploy<br/>shinyapps.io]
+    D --> E[Share URL<br/>portfolio evidence]
+```
+
+## 1. Anatomy of a Shiny app
+
+Two objects: a **UI** (layout + inputs/outputs) and a **server** (how outputs depend on inputs). Reactivity is a dependency graph — change `input$trait` and only downstream pieces recompute.
+
+Three functions cover most needs: `reactive()` (shared computed value), `render*()` (outputs), `observeEvent()` (side-effects like downloads).
+
+## 2. The course app: GWAS + GS explorer
+
+Full source in [`shiny-app/app.R`](https://github.com/sampathperumal/genomic-biostats-course/blob/main/shiny-app/app.R). Core skeleton:
+
+```{r}
+#| eval: false
+library(shiny); library(bslib); library(plotly); library(DT)
+
+gwas <- readRDS("gwas_results.rds")   # trait, chr, pos, pvalue (Weeks 2–4 output)
+
+ui <- page_sidebar(
+  title = "Crop GWAS & GS Explorer — Sampath Perumal",
+  sidebar = sidebar(
+    selectInput("trait", "Trait", unique(gwas$trait)),
+    sliderInput("thr", "-log10(p) threshold", 2, 10, 5, step = .5)
+  ),
+  card(card_header("Manhattan plot"), plotlyOutput("man")),
+  card(card_header("Significant markers"), DTOutput("tbl"))
+)
+
+server <- function(input, output, session) {
+  gw <- reactive(dplyr::filter(gwas, trait == input$trait))
+  output$man <- renderPlotly({
+    d <- gw()
+    plot_ly(d, x = ~cum_pos, y = ~-log10(pvalue),
+            color = ~factor(chr %% 2), colors = c("#159957", "#1e6bb8"),
+            type = "scattergl", mode = "markers",
+            text = ~marker, hoverinfo = "text+y") |>
+      layout(showlegend = FALSE,
+             shapes = list(list(type = "line", x0 = 0, x1 = max(d$cum_pos),
+                                y0 = input$thr, y1 = input$thr,
+                                line = list(dash = "dot"))))
+  })
+  output$tbl <- renderDT(dplyr::filter(gw(), -log10(pvalue) > input$thr))
+}
+
+shinyApp(ui, server)
+```
+
+## 3. Reactivity rules that prevent 90% of bugs
+
+- Compute once in a `reactive()`, use it in many outputs — never repeat filtering inside each `render*()`.
+- No side-effects inside `reactive()`; those belong in `observeEvent()`.
+- Big data: load once outside `server`, filter inside.
+
+## 4. Deploy in 10 minutes
+
+```{r}
+#| eval: false
+install.packages("rsconnect")
+rsconnect::setAccountInfo(name = "ACCOUNT", token = "TOKEN", secret = "SECRET")
+rsconnect::deployApp("shiny-app/")
+```
+
+Free tier at [shinyapps.io](https://www.shinyapps.io) → a public URL. Put that URL on your CV and in job applications — a *deployed* app is proof, a script is a claim.
+
+## 5. Level-ups
+
+`golem` for packaged production apps · `shinytest2` for testing · Docker for self-hosting · connect to Week 7's database instead of RDS files.
+
+## Exercises
+
+1. Run the app locally with Week 3/4 outputs saved as `gwas_results.rds`.
+2. Add a GS tab: observed-vs-predicted scatter with a model selector (ridge/BayesB/RF).
+3. Add `downloadHandler` to export the filtered marker table as CSV.
+4. Deploy and send the URL to a colleague on their phone.

@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use this course, please cite it as below."
+title: "Applied Biostatistics & Machine Learning for Crop Genomics"
+authors:
+  - family-names: Perumal
+    given-names: Sampath
+    affiliation: "National Research Council of Canada, Saskatoon"
+year: 2026
+url: "https://sampathperumal.github.io/genomic-biostats-course/"
+repository-code: "https://github.com/sampathperumal/genomic-biostats-course"
+license: MIT

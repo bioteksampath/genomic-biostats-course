@@ -1,0 +1,55 @@
+---
+title: "Setup: install everything at once"
+---
+
+```{mermaid}
+flowchart LR
+    A[Install R ≥ 4.3<br/>+ RStudio/Positron] --> B[Run setup/install.R<br/>one command, all R packages]
+    B --> C{Python weeks?}
+    C -- yes --> D[conda env create<br/>-f setup/environment.yml]
+    C -- no --> E[Verify install]
+    D --> E
+```
+
+## 1. R and an IDE
+
+- Install **R ≥ 4.3** from [CRAN](https://cran.r-project.org/)
+- Install [RStudio Desktop](https://posit.co/download/rstudio-desktop/) (or [Positron](https://positron.posit.co/))
+- Install [Quarto](https://quarto.org/docs/get-started/) (bundled with recent RStudio)
+
+## 2. All R packages in one command
+
+From the repo root:
+
+```{r}
+#| eval: false
+source("setup/install.R")
+```
+
+This uses **pak**, which resolves CRAN, Bioconductor, and GitHub dependencies together and installs in parallel — typically 10–15 minutes on a fresh machine.
+
+## 3. Python environment (Weeks 4, 5, 8)
+
+Optional but recommended. Install [Miniforge](https://github.com/conda-forge/miniforge), then:
+
+```bash
+conda env create -f setup/environment.yml
+conda activate biostats-course
+```
+
+## 4. Verify your installation
+
+```{r}
+#| eval: false
+pkgs <- c("sommer","lme4","mixOmics","BGLR","tidymodels","xgboost",
+          "DESeq2","shiny","plumber","agridat")
+ok <- sapply(pkgs, requireNamespace, quietly = TRUE)
+data.frame(package = pkgs, installed = ok)
+```
+
+All `TRUE`? You're ready for [Week 0](weeks/week0a-biostats-primer.qmd).
+
+::: {.callout-tip}
+## Reproducibility
+The repo ships an `renv.lock` snapshot. To reproduce exact versions later: `renv::restore()`.
+:::
