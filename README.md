@@ -2,7 +2,7 @@
 
 **Author: Sampath Perumal, PhD** — NRC Saskatoon
 
-🌐 **[View the course website](https://sampathperumal.github.io/genomic-biostats-course/)**
+🌐 **[View the course website](https://bioteksampath.github.io/genomic-biostats-course/)**
 
 An open 8-week, hands-on course using **real canola, wheat, pea, and maize data**: mixed models → multivariate statistics → Bayesian inference → machine learning → multi-omics → Shiny apps → databases/APIs → HPC pipelines. Built with [Quarto](https://quarto.org).
 
@@ -20,13 +20,13 @@ quarto preview
 
 ```bash
 git init && git add -A && git commit -m "Course v1"
-git remote add origin git@github.com:sampathperumal/genomic-biostats-course.git
+git remote add origin git@github.com:bioteksampath/genomic-biostats-course.git
 git push -u origin main
 quarto publish gh-pages        # renders and pushes the website
 ```
 
 Then in repo **Settings → Pages**, confirm source = `gh-pages` branch. Site appears at
-`https://sampathperumal.github.io/genomic-biostats-course/`.
+`https://bioteksampath.github.io/genomic-biostats-course/`.
 
 ## Structure
 
