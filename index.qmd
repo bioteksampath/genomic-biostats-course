@@ -53,8 +53,8 @@ flowchart TD
 
 ## Author
 
-**Sampath Perumal, PhD** — Research Associate, NRC Saskatoon. Plant genomics and predictive breeding: *Nature Plants* (2020), *The Plant Genome* (2025), 40 publications across canola, wheat, pea, and forage genomics. [Scholar](https://scholar.google.com/citations?user=JOuANlIAAAAJ) · [Homepage](https://sampathperumal.github.io)
+**Sampath Perumal, PhD** — Research Associate, NRC Saskatoon. Plant genomics and predictive breeding: *Nature Plants* (2020), *The Plant Genome* (2025), 40 publications across canola, wheat, pea, and forage genomics. [Scholar](https://scholar.google.com/citations?user=JOuANlIAAAAJ) · [Homepage](https://bioteksampath.github.io)
 
 ## License & citation
 
-Content: CC BY 4.0 · Code: MIT. Cite via [CITATION.cff](https://github.com/sampathperumal/genomic-biostats-course/blob/main/CITATION.cff). All datasets belong to their original authors and are credited on each page.
+Content: CC BY 4.0 · Code: MIT. Cite via [CITATION.cff](https://github.com/bioteksampath/genomic-biostats-course/blob/main/CITATION.cff). All datasets belong to their original authors and are credited on each page.
