@@ -1,0 +1,639 @@
+[
+  {
+    "objectID": "weeks/week8-hpc-pipelines.html",
+    "href": "weeks/week8-hpc-pipelines.html",
+    "title": "Week 8 — HPC & Reproducible Pipelines",
+    "section": "",
+    "text": "flowchart LR\n    A[Parallel R&lt;br/&gt;future/furrr] --&gt; B[SLURM&lt;br/&gt;job arrays]\n    B --&gt; C[Snakemake&lt;br/&gt;rule DAG · resume]\n    C --&gt; D[Containers&lt;br/&gt;Apptainer/Docker]\n    D --&gt; E[The reproducibility&lt;br/&gt;stack, assembled]"
+  },
+  {
+    "objectID": "weeks/week8-hpc-pipelines.html#parallel-inside-one-machine",
+    "href": "weeks/week8-hpc-pipelines.html#parallel-inside-one-machine",
+    "title": "Week 8 — HPC & Reproducible Pipelines",
+    "section": "1 1. Parallel inside one machine",
+    "text": "1 1. Parallel inside one machine\n\n\nCode\nlibrary(future); library(furrr)\nplan(multisession, workers = 4)\nacc &lt;- future_map_dbl(1:20, \\(rep) run_one_cv_rep(rep), .options = furrr_options(seed = TRUE))\n\n\nTwenty CV repeats on 4 cores — the gateway drug to real parallelism."
+  },
+  {
+    "objectID": "weeks/week8-hpc-pipelines.html#slurm-the-clusters-job-manager",
+    "href": "weeks/week8-hpc-pipelines.html#slurm-the-clusters-job-manager",
+    "title": "Week 8 — HPC & Reproducible Pipelines",
+    "section": "2 2. SLURM: the cluster’s job manager",
+    "text": "2 2. SLURM: the cluster’s job manager\njobs/gs_cv.sh:\n#!/bin/bash\n#SBATCH --job-name=gs_cv\n#SBATCH --array=1-25            # 5 folds x 5 models\n#SBATCH --cpus-per-task=4\n#SBATCH --mem=16G\n#SBATCH --time=02:00:00\n#SBATCH --output=logs/%x_%a.out\n\nmodule load r/4.3\nRscript R/run_fold.R \"${SLURM_ARRAY_TASK_ID}\"\nJob arrays turn CV folds, chromosomes, or traits into embarrassingly parallel tasks — one script, 25 jobs, one line to submit (sbatch jobs/gs_cv.sh)."
+  },
+  {
+    "objectID": "weeks/week8-hpc-pipelines.html#snakemake-the-pipeline-as-a-dag",
+    "href": "weeks/week8-hpc-pipelines.html#snakemake-the-pipeline-as-a-dag",
+    "title": "Week 8 — HPC & Reproducible Pipelines",
+    "section": "3 3. Snakemake: the pipeline as a DAG",
+    "text": "3 3. Snakemake: the pipeline as a DAG\nSnakefile (shipped in the repo):\nMODELS = [\"ridge\", \"bayesb\", \"rf\", \"xgb\"]\nFOLDS  = range(1, 6)\n\nrule all:\n    input: \"results/benchmark_report.html\"\n\nrule prep:\n    output: \"data/wheat_ready.rds\"\n    script: \"R/prep_wheat.R\"\n\nrule cv_fold:\n    input:  \"data/wheat_ready.rds\"\n    output: \"results/{model}_fold{fold}.rds\"\n    script: \"R/run_fold_snake.R\"\n\nrule aggregate:\n    input:  expand(\"results/{model}_fold{fold}.rds\", model=MODELS, fold=FOLDS)\n    output: \"results/benchmark.csv\"\n    script: \"R/aggregate.R\"\n\nrule report:\n    input:  \"results/benchmark.csv\"\n    output: \"results/benchmark_report.html\"\n    shell:  \"quarto render report/benchmark.qmd --output-dir ../results\"\nSnakemake infers the dependency graph from filenames, runs independent rules in parallel, and after a crash resumes exactly where it stopped. snakemake --executor slurm -j 25 dispatches rules as SLURM jobs."
+  },
+  {
+    "objectID": "weeks/week8-hpc-pipelines.html#containers-freeze-the-environment",
+    "href": "weeks/week8-hpc-pipelines.html#containers-freeze-the-environment",
+    "title": "Week 8 — HPC & Reproducible Pipelines",
+    "section": "4 4. Containers: freeze the environment",
+    "text": "4 4. Containers: freeze the environment\napptainer pull course.sif docker://rocker/verse:4.3.2\napptainer exec course.sif Rscript R/run_fold.R 1\nSame image on your laptop, the cluster, and a reviewer’s machine three years from now."
+  },
+  {
+    "objectID": "weeks/week8-hpc-pipelines.html#the-reproducibility-stack-the-interview-answer",
+    "href": "weeks/week8-hpc-pipelines.html#the-reproducibility-stack-the-interview-answer",
+    "title": "Week 8 — HPC & Reproducible Pipelines",
+    "section": "5 5. The reproducibility stack — the interview answer",
+    "text": "5 5. The reproducibility stack — the interview answer\n\nCode versioned in Git → packages pinned with renv/conda → environment frozen in a container → steps orchestrated by a workflow manager → seeds set → rendered Quarto report. Anyone can rerun everything with one command.\n\nThat paragraph, delivered confidently, answers “how do you ensure reproducibility?” completely."
+  },
+  {
+    "objectID": "weeks/week8-hpc-pipelines.html#exercises",
+    "href": "weeks/week8-hpc-pipelines.html#exercises",
+    "title": "Week 8 — HPC & Reproducible Pipelines",
+    "section": "6 Exercises",
+    "text": "6 Exercises\n\nConvert Week 4’s benchmark into the Snakefile above (R scripts templated in R/).\nAdd a --configfile with trait choice; rerun for a second trait — note what Snakemake doesn’t recompute.\nWrap the pipeline in the rocker container and rerun.\nCapstone: link the final benchmark.csv into the Week 6 app and the Week 7 database — the full loop: pipeline → database → API → app."
+  },
+  {
+    "objectID": "weeks/week6-shiny-apps.html",
+    "href": "weeks/week6-shiny-apps.html",
+    "title": "Week 6 — Interactive Web Applications with Shiny",
+    "section": "",
+    "text": "flowchart LR\n    A[UI + server&lt;br/&gt;anatomy] --&gt; B[Reactivity&lt;br/&gt;dependency graph]\n    B --&gt; C[Manhattan + GS&lt;br/&gt;explorer app]\n    C --&gt; D[Deploy&lt;br/&gt;shinyapps.io]\n    D --&gt; E[Share URL&lt;br/&gt;portfolio evidence]"
+  },
+  {
+    "objectID": "weeks/week6-shiny-apps.html#anatomy-of-a-shiny-app",
+    "href": "weeks/week6-shiny-apps.html#anatomy-of-a-shiny-app",
+    "title": "Week 6 — Interactive Web Applications with Shiny",
+    "section": "1 1. Anatomy of a Shiny app",
+    "text": "1 1. Anatomy of a Shiny app\nTwo objects: a UI (layout + inputs/outputs) and a server (how outputs depend on inputs). Reactivity is a dependency graph — change input$trait and only downstream pieces recompute.\nThree functions cover most needs: reactive() (shared computed value), render*() (outputs), observeEvent() (side-effects like downloads)."
+  },
+  {
+    "objectID": "weeks/week6-shiny-apps.html#the-course-app-gwas-gs-explorer",
+    "href": "weeks/week6-shiny-apps.html#the-course-app-gwas-gs-explorer",
+    "title": "Week 6 — Interactive Web Applications with Shiny",
+    "section": "2 2. The course app: GWAS + GS explorer",
+    "text": "2 2. The course app: GWAS + GS explorer\nFull source in shiny-app/app.R. Core skeleton:\n\n\nCode\nlibrary(shiny); library(bslib); library(plotly); library(DT)\n\ngwas &lt;- readRDS(\"gwas_results.rds\")   # trait, chr, pos, pvalue (Weeks 2–4 output)\n\nui &lt;- page_sidebar(\n  title = \"Crop GWAS & GS Explorer — Sampath Perumal\",\n  sidebar = sidebar(\n    selectInput(\"trait\", \"Trait\", unique(gwas$trait)),\n    sliderInput(\"thr\", \"-log10(p) threshold\", 2, 10, 5, step = .5)\n  ),\n  card(card_header(\"Manhattan plot\"), plotlyOutput(\"man\")),\n  card(card_header(\"Significant markers\"), DTOutput(\"tbl\"))\n)\n\nserver &lt;- function(input, output, session) {\n  gw &lt;- reactive(dplyr::filter(gwas, trait == input$trait))\n  output$man &lt;- renderPlotly({\n    d &lt;- gw()\n    plot_ly(d, x = ~cum_pos, y = ~-log10(pvalue),\n            color = ~factor(chr %% 2), colors = c(\"#159957\", \"#1e6bb8\"),\n            type = \"scattergl\", mode = \"markers\",\n            text = ~marker, hoverinfo = \"text+y\") |&gt;\n      layout(showlegend = FALSE,\n             shapes = list(list(type = \"line\", x0 = 0, x1 = max(d$cum_pos),\n                                y0 = input$thr, y1 = input$thr,\n                                line = list(dash = \"dot\"))))\n  })\n  output$tbl &lt;- renderDT(dplyr::filter(gw(), -log10(pvalue) &gt; input$thr))\n}\n\nshinyApp(ui, server)"
+  },
+  {
+    "objectID": "weeks/week6-shiny-apps.html#reactivity-rules-that-prevent-90-of-bugs",
+    "href": "weeks/week6-shiny-apps.html#reactivity-rules-that-prevent-90-of-bugs",
+    "title": "Week 6 — Interactive Web Applications with Shiny",
+    "section": "3 3. Reactivity rules that prevent 90% of bugs",
+    "text": "3 3. Reactivity rules that prevent 90% of bugs\n\nCompute once in a reactive(), use it in many outputs — never repeat filtering inside each render*().\nNo side-effects inside reactive(); those belong in observeEvent().\nBig data: load once outside server, filter inside."
+  },
+  {
+    "objectID": "weeks/week6-shiny-apps.html#deploy-in-10-minutes",
+    "href": "weeks/week6-shiny-apps.html#deploy-in-10-minutes",
+    "title": "Week 6 — Interactive Web Applications with Shiny",
+    "section": "4 4. Deploy in 10 minutes",
+    "text": "4 4. Deploy in 10 minutes\n\n\nCode\ninstall.packages(\"rsconnect\")\nrsconnect::setAccountInfo(name = \"ACCOUNT\", token = \"TOKEN\", secret = \"SECRET\")\nrsconnect::deployApp(\"shiny-app/\")\n\n\nFree tier at shinyapps.io → a public URL. Put that URL on your CV and in job applications — a deployed app is proof, a script is a claim."
+  },
+  {
+    "objectID": "weeks/week6-shiny-apps.html#level-ups",
+    "href": "weeks/week6-shiny-apps.html#level-ups",
+    "title": "Week 6 — Interactive Web Applications with Shiny",
+    "section": "5 5. Level-ups",
+    "text": "5 5. Level-ups\ngolem for packaged production apps · shinytest2 for testing · Docker for self-hosting · connect to Week 7’s database instead of RDS files."
+  },
+  {
+    "objectID": "weeks/week6-shiny-apps.html#exercises",
+    "href": "weeks/week6-shiny-apps.html#exercises",
+    "title": "Week 6 — Interactive Web Applications with Shiny",
+    "section": "6 Exercises",
+    "text": "6 Exercises\n\nRun the app locally with Week 3/4 outputs saved as gwas_results.rds.\nAdd a GS tab: observed-vs-predicted scatter with a model selector (ridge/BayesB/RF).\nAdd downloadHandler to export the filtered marker table as CSV.\nDeploy and send the URL to a colleague on their phone."
+  },
+  {
+    "objectID": "weeks/week4-machine-learning.html",
+    "href": "weeks/week4-machine-learning.html",
+    "title": "Week 4 — Machine Learning for Genomic Prediction",
+    "section": "",
+    "text": "flowchart LR\n    A[Bias–variance&lt;br/&gt;tradeoff] --&gt; B[Honest CV&lt;br/&gt;random vs grouped]\n    B --&gt; C[Penalized regression&lt;br/&gt;ridge=GBLUP · LASSO · enet]\n    C --&gt; D[Random Forest&lt;br/&gt;bagging + decorrelation]\n    D --&gt; E[Gradient boosting&lt;br/&gt;sequential residual fitting]\n    E --&gt; F[Benchmark table&lt;br/&gt;+ variable importance]\nDatasets: BGLR::wheat (599 CIMMYT lines) and sommer::DT_technow (real maize hybrids, Technow et al. 2014) — wheat + a Canadian-relevant maize hybrid-prediction problem."
+  },
+  {
+    "objectID": "weeks/week4-machine-learning.html#mechanics-in-plain-language",
+    "href": "weeks/week4-machine-learning.html#mechanics-in-plain-language",
+    "title": "Week 4 — Machine Learning for Genomic Prediction",
+    "section": "1 1. Mechanics in plain language",
+    "text": "1 1. Mechanics in plain language\n\nRidge (L2): shrink all coefficients; never zero. On markers, ridge regression is RR-BLUP is GBLUP — one model, three names. Memorize that identity.\nLASSO (L1): shrink and select (some effects exactly zero). Struggles when SNPs are in LD — it picks one of a correlated set arbitrarily.\nElastic net: blend of both; the practical default for marker data.\nRandom forest: hundreds of trees, each on a bootstrap sample, each split limited to mtry random features. Averaging decorrelated trees slashes variance; out-of-bag samples give free validation; interactions/epistasis are captured without being specified.\nGradient boosting: trees fit sequentially to residuals of the ensemble so far; a small learning rate takes many careful steps. Strongest on tabular data, most tuning-sensitive."
+  },
+  {
+    "objectID": "weeks/week4-machine-learning.html#honest-cross-validation",
+    "href": "weeks/week4-machine-learning.html#honest-cross-validation",
+    "title": "Week 4 — Machine Learning for Genomic Prediction",
+    "section": "2 2. Honest cross-validation",
+    "text": "2 2. Honest cross-validation\nRandom k-fold leaks family information in structured populations — relatives end up in train and test, inflating accuracy. Use grouped CV (leave-family/environment-out) matched to deployment. Saying this unprompted is a senior-analyst signal."
+  },
+  {
+    "objectID": "weeks/week4-machine-learning.html#benchmark-on-wheat",
+    "href": "weeks/week4-machine-learning.html#benchmark-on-wheat",
+    "title": "Week 4 — Machine Learning for Genomic Prediction",
+    "section": "3 3. Benchmark on wheat",
+    "text": "3 3. Benchmark on wheat\n\n\nCode\nlibrary(tidyverse); library(glmnet); library(ranger); library(xgboost); library(BGLR)\ndata(wheat); X &lt;- scale(wheat.X); y &lt;- wheat.Y[,1]\nset.seed(42); folds &lt;- sample(rep(1:5, length.out = length(y)))\n\nbench &lt;- map_dfr(1:5, function(k) {\n  tr &lt;- folds != k; te &lt;- !tr\n  # ridge & lasso (CV-tuned lambda inside training folds only)\n  rid &lt;- cv.glmnet(X[tr,], y[tr], alpha = 0)\n  las &lt;- cv.glmnet(X[tr,], y[tr], alpha = 1)\n  # random forest\n  rf  &lt;- ranger(y = y[tr], x = as.data.frame(X[tr,]), num.trees = 500, seed = 1)\n  # xgboost\n  xgb &lt;- xgboost(data = X[tr,], label = y[tr], nrounds = 300, eta = 0.05,\n                 max_depth = 4, subsample = .8, verbose = 0)\n  tibble(fold = k,\n    Ridge  = cor(predict(rid, X[te,], s = \"lambda.min\"), y[te]),\n    LASSO  = cor(predict(las, X[te,], s = \"lambda.min\"), y[te]),\n    RF     = cor(predict(rf, as.data.frame(X[te,]))$predictions, y[te]),\n    XGB    = cor(predict(xgb, X[te,]), y[te]))\n})\nbench |&gt; summarise(across(-fold, \\(x) round(mean(x), 3)))\n\n\n# A tibble: 1 × 4\n  Ridge LASSO    RF   XGB\n  &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt;\n1 0.526 0.476 0.575 0.578\n\n\nTypical outcome: ridge ≈ or &gt; the fancy learners on polygenic yield. Additive, small-effect traits are ridge’s home turf — the honest conclusion most papers bury."
+  },
+  {
+    "objectID": "weeks/week4-machine-learning.html#which-markers-drive-the-forest",
+    "href": "weeks/week4-machine-learning.html#which-markers-drive-the-forest",
+    "title": "Week 4 — Machine Learning for Genomic Prediction",
+    "section": "4 4. Which markers drive the forest?",
+    "text": "4 4. Which markers drive the forest?\n\n\nCode\nrf_all &lt;- ranger(y = y, x = as.data.frame(X), num.trees = 800,\n                 importance = \"permutation\", seed = 1)\nenframe(sort(rf_all$variable.importance, decreasing = TRUE)[1:20]) |&gt;\n  ggplot(aes(reorder(name, value), value)) + geom_col(fill = \"#159957\") +\n  coord_flip() + theme_minimal() + labs(x = NULL, y = \"Permutation importance\")\n\n\n\n\n\n\n\n\n\nCompare these to single-marker GWAS hits — overlap validates; RF-only hits hint at interactions."
+  },
+  {
+    "objectID": "weeks/week4-machine-learning.html#maize-hybrids-grouped-cv-done-right",
+    "href": "weeks/week4-machine-learning.html#maize-hybrids-grouped-cv-done-right",
+    "title": "Week 4 — Machine Learning for Genomic Prediction",
+    "section": "5 5. Maize hybrids: grouped CV done right",
+    "text": "5 5. Maize hybrids: grouped CV done right\n\n\nCode\nlibrary(sommer); data(DT_technow)\n# Predict *untested* hybrids: leave-one-dent-family-out CV.\n# Template: group folds by DT_technow$dent parent, refit ridge vs XGB,\n# and compare against random CV — expect a sobering accuracy drop.\n\n\n(Left as the week’s main exercise — the accuracy gap between random and grouped CV is the single most instructive number in applied GS.)"
+  },
+  {
+    "objectID": "weeks/week4-machine-learning.html#exercises",
+    "href": "weeks/week4-machine-learning.html#exercises",
+    "title": "Week 4 — Machine Learning for Genomic Prediction",
+    "section": "6 Exercises",
+    "text": "6 Exercises\n\nComplete the Technow grouped-CV comparison; report random-CV vs leave-family-out accuracy for ridge and XGBoost.\nTune mtry for ranger via OOB error; how sensitive is accuracy?\nFit elastic net (alpha = 0.5); does it beat both parents?\n(Python) Reproduce the ridge benchmark in scikit-learn — compare wall-clock time.\n\nData credits: Crossa et al. 2010 (BGLR); Technow et al. 2014 Genetics (sommer)."
+  },
+  {
+    "objectID": "weeks/week2-multivariate.html",
+    "href": "weeks/week2-multivariate.html",
+    "title": "Week 2 — Multivariate Statistics & Dimension Reduction",
+    "section": "",
+    "text": "flowchart LR\n    A[Scaling &&lt;br/&gt;distance] --&gt; B[PCA&lt;br/&gt;structure & QC]\n    B --&gt; C[Clustering&lt;br/&gt;k-means · hierarchical · mclust]\n    C --&gt; D[sPLS-DA&lt;br/&gt;supervised, sparse]\n    D --&gt; E[Validation&lt;br/&gt;permutation · CV]\nDataset: agridat::gauch.soy multi-environment soybean for PCA-of-GxE, plus a built-in genomic marker matrix from sommer::DT_cpdata (real 363-line apple-progeny SNP data) standing in for a pea/canola panel — swap in your own VCF-derived matrix with one line."
+  },
+  {
+    "objectID": "weeks/week2-multivariate.html#pca-what-it-actually-does",
+    "href": "weeks/week2-multivariate.html#pca-what-it-actually-does",
+    "title": "Week 2 — Multivariate Statistics & Dimension Reduction",
+    "section": "1 1. PCA — what it actually does",
+    "text": "1 1. PCA — what it actually does\nPCA eigen-decomposes the covariance matrix: PC1 is the direction of maximum variance, PC2 the next, orthogonal. On a marker matrix, leading PCs approximate ancestry — the population structure you correct for in GWAS.\n\n\nCode\nlibrary(tidyverse); library(sommer); library(factoextra)\ndata(DT_cpdata)                 # DT = pheno, GT = markers (-1/0/1)\nM &lt;- GT_cpdata\np &lt;- prcomp(M, scale. = TRUE)\nfviz_eig(p, addlabels = TRUE, ncp = 8)\n\n\n\n\n\n\n\n\n\n\n\nCode\nscores &lt;- as_tibble(p$x[,1:2]) |&gt; mutate(color = DT_cpdata$color)\nggplot(scores, aes(PC1, PC2, colour = color)) + geom_point(alpha = .7) +\n  theme_minimal() + labs(title = \"Genetic structure from SNPs\")\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nTip\n\n\n\nSwap in your crop: M &lt;- vcfR::extract.gt(...) → numeric matrix → identical workflow for a pea or canola panel."
+  },
+  {
+    "objectID": "weeks/week2-multivariate.html#how-many-groups-clustering-with-validation",
+    "href": "weeks/week2-multivariate.html#how-many-groups-clustering-with-validation",
+    "title": "Week 2 — Multivariate Statistics & Dimension Reduction",
+    "section": "2 2. How many groups? Clustering with validation",
+    "text": "2 2. How many groups? Clustering with validation\n\n\nCode\nlibrary(mclust)\nkm  &lt;- kmeans(p$x[,1:5], centers = 3, nstart = 25)\nmc  &lt;- Mclust(p$x[,1:5], G = 1:6)     # model-based; picks G by BIC\nmc$G\n\n\n[1] 1\n\n\nCode\nfviz_cluster(km, data = p$x[,1:2], geom = \"point\") + theme_minimal()\n\n\n\n\n\n\n\n\n\nk-means needs k chosen; mclust fits Gaussian mixtures and lets BIC choose. Report silhouette or BIC, never just a pretty plot."
+  },
+  {
+    "objectID": "weeks/week2-multivariate.html#supervised-sparse-pls-da",
+    "href": "weeks/week2-multivariate.html#supervised-sparse-pls-da",
+    "title": "Week 2 — Multivariate Statistics & Dimension Reduction",
+    "section": "3 3. Supervised: sparse PLS-DA",
+    "text": "3 3. Supervised: sparse PLS-DA\nPCA ignores labels. PLS-DA finds components that separate known groups; the sparse version selects a small marker/metabolite panel — interpretable and directly useful for assay design.\n\n\nCode\nlibrary(mixOmics)\nY &lt;- factor(km$cluster)                     # demo labels; use market class/origin in practice\nres &lt;- splsda(M, Y, ncomp = 2, keepX = c(30, 20))\nplotIndiv(res, ellipse = TRUE, legend = TRUE, title = \"sPLS-DA\")\n\n\n\n\n\n\n\n\n\nHonest validation — mandatory:\n\n\nCode\nperf(res, validation = \"Mfold\", folds = 5, nrepeat = 20)   # error rates\n# + permutation test: shuffle Y, refit — separation should collapse\n\n\nsPLS-DA will happily “separate” random labels; permutation testing is what keeps you honest (a favourite interview probe)."
+  },
+  {
+    "objectID": "weeks/week2-multivariate.html#gxe-with-pca-the-ammi-idea",
+    "href": "weeks/week2-multivariate.html#gxe-with-pca-the-ammi-idea",
+    "title": "Week 2 — Multivariate Statistics & Dimension Reduction",
+    "section": "4 4. GxE with PCA: the AMMI idea",
+    "text": "4 4. GxE with PCA: the AMMI idea\n\n\nCode\nlibrary(agridat); data(gauch.soy)\ngxe &lt;- gauch.soy |&gt; group_by(gen, env) |&gt; summarise(y = mean(yield), .groups=\"drop\") |&gt;\n  pivot_wider(names_from = env, values_from = y) |&gt; column_to_rownames(\"gen\")\ngxe_c &lt;- sweep(sweep(as.matrix(gxe), 1, rowMeans(gxe)), 2, colMeans(gxe)) + mean(as.matrix(gxe))\npg &lt;- prcomp(gxe_c)\nfviz_pca_biplot(pg, repel = TRUE, geom = \"point\", title = \"AMMI-style GxE biplot\")\n\n\n\n\n\n\n\n\n\nGenotypes near the origin are stable; those aligned with an environment vector are specifically adapted — the statistical heart of MET interpretation."
+  },
+  {
+    "objectID": "weeks/week2-multivariate.html#exercises",
+    "href": "weeks/week2-multivariate.html#exercises",
+    "title": "Week 2 — Multivariate Statistics & Dimension Reduction",
+    "section": "5 Exercises",
+    "text": "5 Exercises\n\nChoose k for the SNP data by silhouette width; does it agree with mclust’s BIC?\nRun perf() on the sPLS-DA — report the balanced error rate per component.\nReplace demo labels with DT_cpdata$color classes and re-select markers; how many are needed for &lt;10% error?\n\nData credits: DT_cpdata (Covarrubias-Pazaran, sommer); Gauch soybean (agridat)."
+  },
+  {
+    "objectID": "weeks/week0c-other-languages.html",
+    "href": "weeks/week0c-other-languages.html",
+    "title": "Week 0c — Python, Bash, and SQL",
+    "section": "",
+    "text": "flowchart TD\n    R[R — statistics, models, plots, Shiny&lt;br/&gt;Weeks 1–7] --- P[Python — scikit-learn, MOFA backend, Snakemake&lt;br/&gt;Weeks 4 · 5 · 8]\n    R --- B[Bash/Linux — files, SLURM&lt;br/&gt;Week 8]\n    R --- S[SQL — relational queries&lt;br/&gt;Week 7]"
+  },
+  {
+    "objectID": "weeks/week0c-other-languages.html#r-vs-python-the-honest-answer",
+    "href": "weeks/week0c-other-languages.html#r-vs-python-the-honest-answer",
+    "title": "Week 0c — Python, Bash, and SQL",
+    "section": "1 R vs Python — the honest answer",
+    "text": "1 R vs Python — the honest answer\n\n\n\n\n\n\n\nTask\nReach for\n\n\n\n\nMixed models, quantitative genetics, GWAS/GS\nR (sommer, BGLR, rrBLUP — unmatched)\n\n\nPublication figures, interactive apps\nR (ggplot2, Shiny)\n\n\nDeep learning, large-scale ML engineering\nPython (scikit-learn, PyTorch)\n\n\nWorkflow orchestration on clusters\nPython-adjacent (Snakemake, Nextflow)\n\n\nSequence wrangling at scale\nBash + compiled tools (samtools, bcftools)\n\n\n\nIn a biostatistics role you will live in R and read Python. This course mirrors that."
+  },
+  {
+    "objectID": "weeks/week0c-other-languages.html#python-in-15-lines-week-4-preview",
+    "href": "weeks/week0c-other-languages.html#python-in-15-lines-week-4-preview",
+    "title": "Week 0c — Python, Bash, and SQL",
+    "section": "2 Python in 15 lines (Week 4 preview)",
+    "text": "2 Python in 15 lines (Week 4 preview)\nimport pandas as pd\nfrom sklearn.ensemble import RandomForestRegressor\nfrom sklearn.model_selection import cross_val_score\n\nX = pd.read_csv(\"data/wheat_markers.csv\")     # lines x SNPs\ny = pd.read_csv(\"data/wheat_pheno.csv\")[\"yield\"]\n\nrf = RandomForestRegressor(n_estimators=500, n_jobs=-1, random_state=1)\nprint(cross_val_score(rf, X, y, cv=5, scoring=\"r2\").mean())\nSame logic as R’s ranger — different dialect."
+  },
+  {
+    "objectID": "weeks/week0c-other-languages.html#bash-you-actually-need",
+    "href": "weeks/week0c-other-languages.html#bash-you-actually-need",
+    "title": "Week 0c — Python, Bash, and SQL",
+    "section": "3 Bash you actually need",
+    "text": "3 Bash you actually need\nwc -l genotypes.vcf                    # how big is it\ngrep -v \"^#\" genotypes.vcf | head     # skip VCF header\ncut -f1,2,4,5 snps.tsv | sort | uniq -c\nawk '$5 &gt; 0.05' maf.txt &gt; common_snps.txt\nPlus a SLURM template (Week 8):\n#!/bin/bash\n#SBATCH --job-name=gs_cv --array=1-25\n#SBATCH --cpus-per-task=4 --mem=16G --time=02:00:00\nRscript R/run_fold.R ${SLURM_ARRAY_TASK_ID}"
+  },
+  {
+    "objectID": "weeks/week0c-other-languages.html#sql-in-four-verbs-week-7-preview",
+    "href": "weeks/week0c-other-languages.html#sql-in-four-verbs-week-7-preview",
+    "title": "Week 0c — Python, Bash, and SQL",
+    "section": "4 SQL in four verbs (Week 7 preview)",
+    "text": "4 SQL in four verbs (Week 7 preview)\nSELECT trait, marker, pvalue\nFROM gwas_results\nWHERE pvalue &lt; 1e-6\nORDER BY pvalue\nLIMIT 20;\nSELECT–FROM–WHERE–JOIN cover most real use; Week 7 builds a breeding database and queries it from R."
+  },
+  {
+    "objectID": "weeks/week0c-other-languages.html#exercise",
+    "href": "weeks/week0c-other-languages.html#exercise",
+    "title": "Week 0c — Python, Bash, and SQL",
+    "section": "5 Exercise",
+    "text": "5 Exercise\nInstall the conda environment from Setup, open JupyterLab, and run the Python snippet above on any CSV you have. Note what felt familiar from R."
+  },
+  {
+    "objectID": "weeks/week0a-biostats-primer.html",
+    "href": "weeks/week0a-biostats-primer.html",
+    "title": "Week 0a — Biostatistics Primer",
+    "section": "",
+    "text": "flowchart LR\n    A[Populations&lt;br/&gt;vs samples] --&gt; B[Distributions&lt;br/&gt;normal · binomial · Poisson · NB]\n    B --&gt; C[Hypothesis testing&lt;br/&gt;p-values · errors · power]\n    C --&gt; D[Confidence&lt;br/&gt;intervals]\n    D --&gt; E[Experimental design&lt;br/&gt;replication · randomization · blocking]\n    E --&gt; F[Multiple testing&lt;br/&gt;preview for GWAS]"
+  },
+  {
+    "objectID": "weeks/week0a-biostats-primer.html#what-biostatistics-is",
+    "href": "weeks/week0a-biostats-primer.html#what-biostatistics-is",
+    "title": "Week 0a — Biostatistics Primer",
+    "section": "1 What biostatistics is",
+    "text": "1 What biostatistics is\nBiostatistics is the science of learning from biological data in the presence of variation. Two plants of the same genotype never yield identically — the job is to separate signal (genetics, treatment) from noise (environment, measurement) and to state honestly how sure we are."
+  },
+  {
+    "objectID": "weeks/week0a-biostats-primer.html#populations-samples-and-estimation",
+    "href": "weeks/week0a-biostats-primer.html#populations-samples-and-estimation",
+    "title": "Week 0a — Biostatistics Primer",
+    "section": "2 Populations, samples, and estimation",
+    "text": "2 Populations, samples, and estimation\n\nPopulation: every canola plant that could ever be grown from a cultivar.\nSample: the 200 plots you actually harvested.\nParameter (unknown truth, e.g. true mean yield μ) vs estimate (your sample mean x̄).\n\nStatistical inference quantifies how far x̄ may sit from μ."
+  },
+  {
+    "objectID": "weeks/week0a-biostats-primer.html#distributions-you-will-meet-constantly",
+    "href": "weeks/week0a-biostats-primer.html#distributions-you-will-meet-constantly",
+    "title": "Week 0a — Biostatistics Primer",
+    "section": "3 Distributions you will meet constantly",
+    "text": "3 Distributions you will meet constantly\n\n\nCode\nlibrary(tidyverse)\nset.seed(1)\nd &lt;- bind_rows(\n  tibble(x = rnorm(4000, 40, 6),        dist = \"Normal — yield (bu/ac)\"),\n  tibble(x = rbinom(4000, 10, .3),      dist = \"Binomial — diseased plants /10\"),\n  tibble(x = rnbinom(4000, mu = 20, size = 2), dist = \"Neg. binomial — RNA-seq counts\")\n)\nggplot(d, aes(x)) + geom_histogram(bins = 40, fill = \"#159957\") +\n  facet_wrap(~dist, scales = \"free\") + theme_minimal()\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nDistribution\nCrop example\nModel family\n\n\n\n\nNormal\nyield, height, oil %\nlinear model\n\n\nBinomial\ndisease incidence\nlogistic GLM\n\n\nPoisson / Negative binomial\ncounts; RNA-seq reads\ncount GLM (NB handles overdispersion)"
+  },
+  {
+    "objectID": "weeks/week0a-biostats-primer.html#hypothesis-testing-in-five-sentences",
+    "href": "weeks/week0a-biostats-primer.html#hypothesis-testing-in-five-sentences",
+    "title": "Week 0a — Biostatistics Primer",
+    "section": "4 Hypothesis testing in five sentences",
+    "text": "4 Hypothesis testing in five sentences\n\nState a null H₀ (e.g., “no yield difference between lines”).\nCompute a test statistic from the data.\nThe p-value = probability of a statistic at least this extreme if H₀ were true. It is not the probability H₀ is true.\nType I error (α): rejecting a true H₀ — false positive. Type II (β): missing a real effect. Power = 1 − β, driven by replication, effect size, and noise.\nA tiny p with a trivial effect size is not a finding — always report effect sizes.\n\n\n\nCode\nt.test(extra ~ group, data = sleep)   # classic built-in example\n\n\n\n    Welch Two Sample t-test\n\ndata:  extra by group\nt = -1.8608, df = 17.776, p-value = 0.07939\nalternative hypothesis: true difference in means between group 1 and group 2 is not equal to 0\n95 percent confidence interval:\n -3.3654832  0.2054832\nsample estimates:\nmean in group 1 mean in group 2 \n           0.75            2.33"
+  },
+  {
+    "objectID": "weeks/week0a-biostats-primer.html#confidence-intervals",
+    "href": "weeks/week0a-biostats-primer.html#confidence-intervals",
+    "title": "Week 0a — Biostatistics Primer",
+    "section": "5 Confidence intervals",
+    "text": "5 Confidence intervals\nA 95% CI is the set of parameter values compatible with the data: across repeated experiments, 95% of such intervals capture the truth. Prefer CIs to bare p-values — they show magnitude and uncertainty."
+  },
+  {
+    "objectID": "weeks/week0a-biostats-primer.html#experimental-design-where-good-statistics-starts",
+    "href": "weeks/week0a-biostats-primer.html#experimental-design-where-good-statistics-starts",
+    "title": "Week 0a — Biostatistics Primer",
+    "section": "6 Experimental design — where good statistics starts",
+    "text": "6 Experimental design — where good statistics starts\n\nReplication — quantifies noise; no reps, no inference.\nRandomization — protects against hidden bias (soil gradients).\nBlocking — put comparisons close together: RCBD, alpha-lattice, row–column designs used in every serious yield trial. Week 1 models these directly."
+  },
+  {
+    "objectID": "weeks/week0a-biostats-primer.html#why-multiple-testing-matters-gwas-preview",
+    "href": "weeks/week0a-biostats-primer.html#why-multiple-testing-matters-gwas-preview",
+    "title": "Week 0a — Biostatistics Primer",
+    "section": "7 Why multiple testing matters (GWAS preview)",
+    "text": "7 Why multiple testing matters (GWAS preview)\nTest 1 SNP at α = 0.05 → 5% false-positive risk. Test 500,000 SNPs → ~25,000 false positives expected under the null. Week 2–3 pages use Bonferroni and FDR to fix this."
+  },
+  {
+    "objectID": "weeks/week0a-biostats-primer.html#exercises",
+    "href": "weeks/week0a-biostats-primer.html#exercises",
+    "title": "Week 0a — Biostatistics Primer",
+    "section": "8 Exercises",
+    "text": "8 Exercises\n\nSimulate 1,000 t-tests under the null (rnorm both groups). What fraction have p &lt; 0.05? Why?\nFor a trait with σ = 5 and a true difference of 2, use power.t.test() to find n per group for 80% power.\nSketch (on paper) an RCBD for 20 lines, 3 blocks, on a field with a known fertility gradient."
+  },
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "Applied Biostatistics & Machine Learning for Crop Genomics",
+    "section": "",
+    "text": "This course teaches the statistical foundations behind modern crop genomics — mixed models, multivariate statistics, Bayesian inference, machine learning, multi-omics integration — and the delivery skills that turn analysis into tools: interactive web apps, databases, and HPC pipelines.\nEvery module runs on real, public datasets from crops that matter to Canadian agriculture: prairie yield trials, CIMMYT wheat, pea diversity panels, canola RNA-seq, and maize hybrids.\n\n\n\n\n\n\nWho this is for\n\n\n\nBioinformaticians and geneticists who use statistics daily and want to understand how the methods actually work — and statisticians who want realistic genomic case studies."
+  },
+  {
+    "objectID": "index.html#welcome",
+    "href": "index.html#welcome",
+    "title": "Applied Biostatistics & Machine Learning for Crop Genomics",
+    "section": "",
+    "text": "This course teaches the statistical foundations behind modern crop genomics — mixed models, multivariate statistics, Bayesian inference, machine learning, multi-omics integration — and the delivery skills that turn analysis into tools: interactive web apps, databases, and HPC pipelines.\nEvery module runs on real, public datasets from crops that matter to Canadian agriculture: prairie yield trials, CIMMYT wheat, pea diversity panels, canola RNA-seq, and maize hybrids.\n\n\n\n\n\n\nWho this is for\n\n\n\nBioinformaticians and geneticists who use statistics daily and want to understand how the methods actually work — and statisticians who want realistic genomic case studies."
+  },
+  {
+    "objectID": "index.html#course-map",
+    "href": "index.html#course-map",
+    "title": "Applied Biostatistics & Machine Learning for Crop Genomics",
+    "section": "2 Course map",
+    "text": "2 Course map\n\n\n\n\n\nflowchart TD\n    A[Week 0&lt;br/&gt;Biostats primer · R · Python/Bash/SQL] --&gt; B[Week 1&lt;br/&gt;Linear & Mixed Models&lt;br/&gt;&lt;i&gt;prairie yield trials&lt;/i&gt;]\n    B --&gt; C[Week 2&lt;br/&gt;Multivariate & Dimension Reduction&lt;br/&gt;&lt;i&gt;pea diversity&lt;/i&gt;]\n    C --&gt; D[Week 3&lt;br/&gt;Bayesian Inference&lt;br/&gt;&lt;i&gt;CIMMYT wheat&lt;/i&gt;]\n    D --&gt; E[Week 4&lt;br/&gt;Machine Learning&lt;br/&gt;&lt;i&gt;wheat + maize hybrids&lt;/i&gt;]\n    E --&gt; F[Week 5&lt;br/&gt;RNA-seq & Multi-omics&lt;br/&gt;&lt;i&gt;canola&lt;/i&gt;]\n    F --&gt; G[Week 6&lt;br/&gt;Shiny Web Apps]\n    G --&gt; H[Week 7&lt;br/&gt;Databases & APIs]\n    H --&gt; I[Week 8&lt;br/&gt;HPC & Reproducible Pipelines]\n    style A fill:#e8f5e9\n    style I fill:#e3f2fd"
+  },
+  {
+    "objectID": "index.html#weekly-outline",
+    "href": "index.html#weekly-outline",
+    "title": "Applied Biostatistics & Machine Learning for Crop Genomics",
+    "section": "3 Weekly outline",
+    "text": "3 Weekly outline\n\n\n\n\n\n\n\n\n\nWeek\nTopic\nDataset\nKey packages\n\n\n\n\n0\nBiostatistics, R, and friends\n—\ntidyverse\n\n\n1\nLinear & mixed models, spatial trials\nagridat prairie trials\nsommer, lme4\n\n\n2\nPCA, PLS-DA, clustering\nPea GWAS panel\nmixOmics, FactoMineR\n\n\n3\nBayesian regression & MCMC\nBGLR::wheat (CIMMYT)\nBGLR, coda\n\n\n4\nPenalized regression, RF, boosting\nwheat + DT_technow maize\ntidymodels, xgboost\n\n\n5\nRNA-seq DE, WGCNA, MOFA2\nCanola GEO counts\nDESeq2, MOFA2\n\n\n6\nInteractive apps\nWeeks 2–4 outputs\nshiny, plotly\n\n\n7\nSQL & REST APIs\nWeeks 2–4 outputs\nRSQLite, plumber\n\n\n8\nSLURM, Snakemake, containers\nWeek 4 pipeline\nsnakemake"
+  },
+  {
+    "objectID": "index.html#how-to-use-this-course",
+    "href": "index.html#how-to-use-this-course",
+    "title": "Applied Biostatistics & Machine Learning for Crop Genomics",
+    "section": "4 How to use this course",
+    "text": "4 How to use this course\n\nComplete Setup — one command installs everything.\nWork each week’s page top-to-bottom; every page ends with exercises.\nEach .qmd is downloadable (code button, top right) to run locally."
+  },
+  {
+    "objectID": "index.html#author",
+    "href": "index.html#author",
+    "title": "Applied Biostatistics & Machine Learning for Crop Genomics",
+    "section": "5 Author",
+    "text": "5 Author\nSampath Perumal, PhD — Research Associate, NRC Saskatoon. Plant genomics and predictive breeding: Nature Plants (2020), The Plant Genome (2025), 40 publications across canola, wheat, pea, and forage genomics. Scholar · Homepage"
+  },
+  {
+    "objectID": "index.html#license-citation",
+    "href": "index.html#license-citation",
+    "title": "Applied Biostatistics & Machine Learning for Crop Genomics",
+    "section": "6 License & citation",
+    "text": "6 License & citation\nContent: CC BY 4.0 · Code: MIT. Cite via CITATION.cff. All datasets belong to their original authors and are credited on each page."
+  },
+  {
+    "objectID": "setup.html",
+    "href": "setup.html",
+    "title": "Setup: install everything at once",
+    "section": "",
+    "text": "flowchart LR\n    A[Install R ≥ 4.3&lt;br/&gt;+ RStudio/Positron] --&gt; B[Run setup/install.R&lt;br/&gt;one command, all R packages]\n    B --&gt; C{Python weeks?}\n    C -- yes --&gt; D[conda env create&lt;br/&gt;-f setup/environment.yml]\n    C -- no --&gt; E[Verify install]\n    D --&gt; E"
+  },
+  {
+    "objectID": "setup.html#r-and-an-ide",
+    "href": "setup.html#r-and-an-ide",
+    "title": "Setup: install everything at once",
+    "section": "1 1. R and an IDE",
+    "text": "1 1. R and an IDE\n\nInstall R ≥ 4.3 from CRAN\nInstall RStudio Desktop (or Positron)\nInstall Quarto (bundled with recent RStudio)"
+  },
+  {
+    "objectID": "setup.html#all-r-packages-in-one-command",
+    "href": "setup.html#all-r-packages-in-one-command",
+    "title": "Setup: install everything at once",
+    "section": "2 2. All R packages in one command",
+    "text": "2 2. All R packages in one command\nFrom the repo root:\n\n\nCode\nsource(\"setup/install.R\")\n\n\nThis uses pak, which resolves CRAN, Bioconductor, and GitHub dependencies together and installs in parallel — typically 10–15 minutes on a fresh machine."
+  },
+  {
+    "objectID": "setup.html#python-environment-weeks-4-5-8",
+    "href": "setup.html#python-environment-weeks-4-5-8",
+    "title": "Setup: install everything at once",
+    "section": "3 3. Python environment (Weeks 4, 5, 8)",
+    "text": "3 3. Python environment (Weeks 4, 5, 8)\nOptional but recommended. Install Miniforge, then:\nconda env create -f setup/environment.yml\nconda activate biostats-course"
+  },
+  {
+    "objectID": "setup.html#verify-your-installation",
+    "href": "setup.html#verify-your-installation",
+    "title": "Setup: install everything at once",
+    "section": "4 4. Verify your installation",
+    "text": "4 4. Verify your installation\n\n\nCode\npkgs &lt;- c(\"sommer\",\"lme4\",\"mixOmics\",\"BGLR\",\"tidymodels\",\"xgboost\",\n          \"DESeq2\",\"shiny\",\"plumber\",\"agridat\")\nok &lt;- sapply(pkgs, requireNamespace, quietly = TRUE)\ndata.frame(package = pkgs, installed = ok)\n\n\nAll TRUE? You’re ready for Week 0.\n\n\n\n\n\n\nReproducibility\n\n\n\nThe repo ships an renv.lock snapshot. To reproduce exact versions later: renv::restore()."
+  },
+  {
+    "objectID": "weeks/week0b-r-essentials.html",
+    "href": "weeks/week0b-r-essentials.html",
+    "title": "Week 0b — R Essentials",
+    "section": "",
+    "text": "flowchart LR\n    A[Projects &&lt;br/&gt;working directory] --&gt; B[Vectors &&lt;br/&gt;data frames]\n    B --&gt; C[tidyverse verbs&lt;br/&gt;filter · mutate · summarise]\n    C --&gt; D[ggplot2&lt;br/&gt;grammar of graphics]\n    D --&gt; E[Functions &&lt;br/&gt;reading genomic files]\n    E --&gt; F[Quarto&lt;br/&gt;reports]"
+  },
+  {
+    "objectID": "weeks/week0b-r-essentials.html#projects-and-paths",
+    "href": "weeks/week0b-r-essentials.html#projects-and-paths",
+    "title": "Week 0b — R Essentials",
+    "section": "1 Projects and paths",
+    "text": "1 Projects and paths\nAlways work inside an RStudio Project (.Rproj) and build paths with here::here() — scripts then run on any machine, which is half of reproducibility."
+  },
+  {
+    "objectID": "weeks/week0b-r-essentials.html#vectors-and-data-frames",
+    "href": "weeks/week0b-r-essentials.html#vectors-and-data-frames",
+    "title": "Week 0b — R Essentials",
+    "section": "2 Vectors and data frames",
+    "text": "2 Vectors and data frames\n\n\nCode\nyield  &lt;- c(42.1, 39.8, 45.3, 41.0)          # numeric vector\nline   &lt;- c(\"L1\", \"L2\", \"L3\", \"L4\")\ntrial  &lt;- data.frame(line, yield)\ntrial$yield_kg &lt;- trial$yield * 67.25         # bu/ac -&gt; kg/ha (canola)\ntrial\n\n\n  line yield yield_kg\n1   L1  42.1 2831.225\n2   L2  39.8 2676.550\n3   L3  45.3 3046.425\n4   L4  41.0 2757.250"
+  },
+  {
+    "objectID": "weeks/week0b-r-essentials.html#the-six-tidyverse-verbs-that-do-90-of-work",
+    "href": "weeks/week0b-r-essentials.html#the-six-tidyverse-verbs-that-do-90-of-work",
+    "title": "Week 0b — R Essentials",
+    "section": "3 The six tidyverse verbs that do 90% of work",
+    "text": "3 The six tidyverse verbs that do 90% of work\n\n\nCode\nlibrary(tidyverse)\noats &lt;- agridat::yates.oats   # a real 1930s split-plot oat trial (Yates)\nglimpse(oats)\n\n\nRows: 72\nColumns: 8\n$ row   &lt;int&gt; 16, 12, 3, 14, 8, 5, 15, 11, 3, 14, 8, 6, 16, 11, 4, 13, 7, 6, 1…\n$ col   &lt;int&gt; 3, 4, 3, 1, 2, 2, 4, 4, 4, 2, 1, 1, 4, 3, 4, 1, 1, 2, 3, 3, 3, 2…\n$ yield &lt;int&gt; 80, 60, 89, 117, 64, 70, 82, 102, 82, 114, 103, 108, 94, 89, 86,…\n$ nitro &lt;dbl&gt; 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.4,…\n$ gen   &lt;fct&gt; GoldenRain, GoldenRain, GoldenRain, GoldenRain, GoldenRain, Gold…\n$ block &lt;fct&gt; B1, B2, B3, B4, B5, B6, B1, B2, B3, B4, B5, B6, B1, B2, B3, B4, …\n$ grain &lt;dbl&gt; 20.00, 15.00, 22.25, 29.25, 16.00, 17.50, 20.50, 25.50, 20.50, 2…\n$ straw &lt;dbl&gt; 28.00, 25.00, 40.50, 28.75, 32.00, 27.25, 30.75, 37.75, 36.00, 3…\n\n\nCode\noats |&gt;\n  filter(nitro &gt; 0) |&gt;\n  mutate(yield_t = yield * 0.0251) |&gt;\n  group_by(gen, nitro) |&gt;\n  summarise(mean_yield = mean(yield), .groups = \"drop\") |&gt;\n  arrange(desc(mean_yield)) |&gt;\n  head()\n\n\n# A tibble: 6 × 3\n  gen        nitro mean_yield\n  &lt;fct&gt;      &lt;dbl&gt;      &lt;dbl&gt;\n1 Marvellous   0.6       127.\n2 GoldenRain   0.6       125.\n3 Victory      0.6       118.\n4 Marvellous   0.4       117.\n5 GoldenRain   0.4       115.\n6 Victory      0.4       111.\n\n\nfilter rows · select columns · mutate new variables · group_by+summarise aggregate · arrange sort · left_join merge (genotype ↔︎ phenotype tables)."
+  },
+  {
+    "objectID": "weeks/week0b-r-essentials.html#ggplot2-plots-as-grammar",
+    "href": "weeks/week0b-r-essentials.html#ggplot2-plots-as-grammar",
+    "title": "Week 0b — R Essentials",
+    "section": "4 ggplot2: plots as grammar",
+    "text": "4 ggplot2: plots as grammar\n\n\nCode\nggplot(oats, aes(x = factor(nitro), y = yield, fill = gen)) +\n  geom_boxplot() +\n  labs(x = \"Nitrogen (cwt/ac)\", y = \"Yield\", fill = \"Genotype\",\n       title = \"Yates (1935) oat trial\") +\n  theme_minimal()\n\n\n\n\n\n\n\n\n\nAesthetics map data → visual channels; geoms draw; facets split. Every figure in this course is built this way."
+  },
+  {
+    "objectID": "weeks/week0b-r-essentials.html#reading-genomic-style-files",
+    "href": "weeks/week0b-r-essentials.html#reading-genomic-style-files",
+    "title": "Week 0b — R Essentials",
+    "section": "5 Reading genomic-style files",
+    "text": "5 Reading genomic-style files\n\n\nCode\npheno &lt;- read_csv(\"data/phenotypes.csv\")\ngeno  &lt;- read_tsv(\"data/genotypes.hmp.txt\")          # HapMap\nvcf   &lt;- vcfR::read.vcfR(\"data/snps.vcf.gz\")         # VCF"
+  },
+  {
+    "objectID": "weeks/week0b-r-essentials.html#writing-functions",
+    "href": "weeks/week0b-r-essentials.html#writing-functions",
+    "title": "Week 0b — R Essentials",
+    "section": "6 Writing functions",
+    "text": "6 Writing functions\n\n\nCode\ncv &lt;- function(x) 100 * sd(x, na.rm = TRUE) / mean(x, na.rm = TRUE)\ncv(oats$yield)\n\n\n[1] 26.02534\n\n\nIf you paste code three times, it should be a function; if a function is used in three scripts, it belongs in R/helpers.R."
+  },
+  {
+    "objectID": "weeks/week0b-r-essentials.html#quarto",
+    "href": "weeks/week0b-r-essentials.html#quarto",
+    "title": "Week 0b — R Essentials",
+    "section": "7 Quarto",
+    "text": "7 Quarto\nThis entire website is Quarto: prose + chunks + output in one .qmd. Render with the Render button or quarto render. Your analyses become reports automatically — this is the reporting standard the course assumes."
+  },
+  {
+    "objectID": "weeks/week0b-r-essentials.html#exercises",
+    "href": "weeks/week0b-r-essentials.html#exercises",
+    "title": "Week 0b — R Essentials",
+    "section": "8 Exercises",
+    "text": "8 Exercises\n\nWith agridat::oats, compute the CV of yield per genotype.\nPlot yield vs nitrogen as points + a loess smooth, faceted by genotype.\nWrite standardize &lt;- function(x) returning z-scores; apply it to yield within each block using group_by() |&gt; mutate()."
+  },
+  {
+    "objectID": "weeks/week1-mixed-models.html",
+    "href": "weeks/week1-mixed-models.html",
+    "title": "Week 1 — Linear & Mixed Models",
+    "section": "",
+    "text": "flowchart LR\n    A[Linear model&lt;br/&gt;y = Xβ + e] --&gt; B[GLM&lt;br/&gt;logistic · counts]\n    B --&gt; C[Mixed model&lt;br/&gt;y = Xβ + Zu + e]\n    C --&gt; D[BLUE vs BLUP&lt;br/&gt;shrinkage & h²]\n    D --&gt; E[Spatial models&lt;br/&gt;AR1×AR1 on field trials]\nDataset: agridat::gilmour.serpentine — a real South Australian wheat trial (Gilmour et al. 1997), the canonical spatial-analysis teaching set, plus Yates’ oats for the split-plot classic."
+  },
+  {
+    "objectID": "weeks/week1-mixed-models.html#the-linear-model",
+    "href": "weeks/week1-mixed-models.html#the-linear-model",
+    "title": "Week 1 — Linear & Mixed Models",
+    "section": "1 1. The linear model",
+    "text": "1 1. The linear model\n\n\nCode\nlibrary(tidyverse); library(agridat); library(lme4); library(emmeans)\noats &lt;- agridat::yates.oats\nlm1 &lt;- lm(yield ~ gen + factor(nitro), data = oats)\nanova(lm1)\n\n\nAnalysis of Variance Table\n\nResponse: yield\n              Df  Sum Sq Mean Sq F value    Pr(&gt;F)    \ngen            2  1786.4   893.2  1.9533    0.1499    \nfactor(nitro)  3 20020.5  6673.5 14.5946 2.155e-07 ***\nResiduals     66 30179.1   457.3                      \n---\nSignif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1\n\n\nFixed effects, F-tests — the machinery beneath every ANOVA table you’ve published."
+  },
+  {
+    "objectID": "weeks/week1-mixed-models.html#glms-in-one-chunk",
+    "href": "weeks/week1-mixed-models.html#glms-in-one-chunk",
+    "title": "Week 1 — Linear & Mixed Models",
+    "section": "2 2. GLMs in one chunk",
+    "text": "2 2. GLMs in one chunk\n\n\nCode\n# Binomial GLM: disease incidence example (simulated scores on real structure)\nset.seed(2)\noats$diseased &lt;- rbinom(nrow(oats), 10, plogis(-1 + 0.02 * scale(oats$yield)))\nglm1 &lt;- glm(cbind(diseased, 10 - diseased) ~ gen, family = binomial, data = oats)\nsummary(glm1)$coefficients |&gt; head(3)\n\n\n                 Estimate Std. Error    z value     Pr(&gt;|z|)\n(Intercept)   -0.99039870  0.1452546 -6.8183638 9.208319e-12\ngenMarvellous  0.02099815  0.2049330  0.1024635 9.183888e-01\ngenVictory     0.04179973  0.2044618  0.2044379 8.380113e-01\n\n\nThe same idea powers RNA-seq DE (negative-binomial GLM — Week 5)."
+  },
+  {
+    "objectID": "weeks/week1-mixed-models.html#the-mixed-model-y-xβ-zu-e",
+    "href": "weeks/week1-mixed-models.html#the-mixed-model-y-xβ-zu-e",
+    "title": "Week 1 — Linear & Mixed Models",
+    "section": "3 3. The mixed model: y = Xβ + Zu + e",
+    "text": "3 3. The mixed model: y = Xβ + Zu + e\nBlocks and genotypes become random effects: they share a distribution, so estimates borrow strength and shrink toward the mean.\n\n\nCode\nmm1 &lt;- lmer(yield ~ factor(nitro) + (1 | gen) + (1 | block), data = oats)\nsummary(mm1)$varcor\n\n\n Groups   Name        Std.Dev.\n block    (Intercept) 15.6540 \n gen      (Intercept)  5.2388 \n Residual             15.3130 \n\n\nHeritability from variance components (line-mean basis):\n\n\nCode\nvc &lt;- as.data.frame(VarCorr(mm1))\nVg &lt;- vc$vcov[vc$grp == \"gen\"]; Ve &lt;- vc$vcov[vc$grp == \"Residual\"]\nh2 &lt;- Vg / (Vg + Ve / 3)        # 3 blocks\nround(h2, 2)\n\n\n[1] 0.26\n\n\nBLUP shrinkage, visualized:\n\n\nCode\nre &lt;- ranef(mm1)$gen; blup &lt;- setNames(re[,1], rownames(re))\nblue &lt;- coef(lm(yield ~ gen - 1, oats)) - mean(oats$yield)\ntibble(line = names(blup), BLUE = as.numeric(blue)[seq_along(blup)], BLUP = as.numeric(blup)) |&gt;\n  pivot_longer(-line) |&gt;\n  ggplot(aes(value, line, colour = name)) + geom_point(size = 3) +\n  labs(x = \"Deviation from mean\", colour = NULL) + theme_minimal()\n\n\n\n\n\n\n\n\n\nBLUPs sit closer to zero — shrinkage in proportion to reliability. This is what genomic BLUP does with markers."
+  },
+  {
+    "objectID": "weeks/week1-mixed-models.html#spatial-analysis-of-a-real-field-trial",
+    "href": "weeks/week1-mixed-models.html#spatial-analysis-of-a-real-field-trial",
+    "title": "Week 1 — Linear & Mixed Models",
+    "section": "4 4. Spatial analysis of a real field trial",
+    "text": "4 4. Spatial analysis of a real field trial\n\n\nCode\nlibrary(sommer)\ndata(gilmour.serpentine)\ng &lt;- gilmour.serpentine |&gt; mutate(R = as.numeric(row), C = as.numeric(col))\n\nm_base &lt;- mmer(yield ~ 1, random = ~ gen, data = g, verbose = FALSE)\nm_spat &lt;- mmer(yield ~ 1,\n               random = ~ gen + row + col,\n               data = g, verbose = FALSE)\nc(base = m_base$AIC, spatial = m_spat$AIC)\n\n\n    base  spatial \n331.0000 294.9681 \n\n\nThe row and column random effects soak up field trend; genotype variance is estimated more cleanly and rankings change — decisions change.\n\n\nCode\nggplot(g, aes(C, R, fill = yield)) + geom_tile() +\n  scale_fill_viridis_c() + labs(title = \"Raw field trend — why we model space\") +\n  theme_minimal()"
+  },
+  {
+    "objectID": "weeks/week1-mixed-models.html#interview-grade-summary",
+    "href": "weeks/week1-mixed-models.html#interview-grade-summary",
+    "title": "Week 1 — Linear & Mixed Models",
+    "section": "5 Interview-grade summary",
+    "text": "5 Interview-grade summary\n\nRandom vs fixed: “Random effects share a distribution; I model genotypes as random to get shrunken BLUPs and variance components for heritability.”\nSpatial: “AR1×AR1 or 2-D splines model field trend; ignoring it inflates error and mis-ranks lines.”"
+  },
+  {
+    "objectID": "weeks/week1-mixed-models.html#exercises",
+    "href": "weeks/week1-mixed-models.html#exercises",
+    "title": "Week 1 — Linear & Mixed Models",
+    "section": "6 Exercises",
+    "text": "6 Exercises\n\nRefit m_spat adding rcov = ~ ar1(R):ar1(C) (AR1×AR1 residuals); compare AIC.\nCompute h² from m_spat variance components (vpredict).\nIn Yates’ oats, treat nitrogen as numeric and fit a quadratic response — is the linear model adequate?\n\nData credits: Gilmour et al. (1997) JABES; Yates (1935), via the agridat package (Kevin Wright)."
+  },
+  {
+    "objectID": "weeks/week3-bayesian.html",
+    "href": "weeks/week3-bayesian.html",
+    "title": "Week 3 — Bayesian Inference & Genomic Prediction",
+    "section": "",
+    "text": "flowchart LR\n    A[Bayes theorem&lt;br/&gt;prior × likelihood] --&gt; B[MCMC&lt;br/&gt;Gibbs sampling]\n    B --&gt; C[Diagnostics&lt;br/&gt;trace · R-hat · ESS]\n    C --&gt; D[Bayesian alphabet&lt;br/&gt;BRR · BayesA/B/C · BL]\n    D --&gt; E[Cross-validated&lt;br/&gt;prediction accuracy]\nDataset: BGLR::wheat — 599 CIMMYT wheat lines, 1,279 DArT markers, grain yield in 4 environments (Crossa et al. 2010). The benchmark genomic-selection dataset."
+  },
+  {
+    "objectID": "weeks/week3-bayesian.html#bayes-in-one-paragraph",
+    "href": "weeks/week3-bayesian.html#bayes-in-one-paragraph",
+    "title": "Week 3 — Bayesian Inference & Genomic Prediction",
+    "section": "1 1. Bayes in one paragraph",
+    "text": "1 1. Bayes in one paragraph\nPosterior ∝ likelihood × prior. Priors are regularization with a probability interpretation: a Normal prior on marker effects is ridge/GBLUP; a Laplace prior is the LASSO; mixture priors (BayesB/C) say “most markers do nothing.” With n ≪ p, the prior is not optional — every GS method is a prior choice."
+  },
+  {
+    "objectID": "weeks/week3-bayesian.html#load-the-classic-data",
+    "href": "weeks/week3-bayesian.html#load-the-classic-data",
+    "title": "Week 3 — Bayesian Inference & Genomic Prediction",
+    "section": "2 2. Load the classic data",
+    "text": "2 2. Load the classic data\n\n\nCode\nlibrary(BGLR); library(tidyverse); library(coda)\ndata(wheat)\nX &lt;- scale(wheat.X)          # 599 x 1279 markers\ny &lt;- wheat.Y[, 1]            # yield, environment 1\ndim(X)\n\n\n[1]  599 1279"
+  },
+  {
+    "objectID": "weeks/week3-bayesian.html#fit-bayesian-ridge-and-bayesb",
+    "href": "weeks/week3-bayesian.html#fit-bayesian-ridge-and-bayesb",
+    "title": "Week 3 — Bayesian Inference & Genomic Prediction",
+    "section": "3 3. Fit Bayesian Ridge and BayesB",
+    "text": "3 3. Fit Bayesian Ridge and BayesB\n\n\nCode\nset.seed(7)\ndir.create(\"bglr_tmp\", showWarnings = FALSE)\nfit_brr &lt;- BGLR(y = y, ETA = list(mrk = list(X = X, model = \"BRR\")),\n                nIter = 6000, burnIn = 1000, saveAt = \"bglr_tmp/brr_\", verbose = FALSE)\nfit_bb  &lt;- BGLR(y = y, ETA = list(mrk = list(X = X, model = \"BayesB\")),\n                nIter = 6000, burnIn = 1000, saveAt = \"bglr_tmp/bb_\",  verbose = FALSE)\n\n\n(6k iterations keeps the page fast; use 30k+ with 5k burn-in for real work.)"
+  },
+  {
+    "objectID": "weeks/week3-bayesian.html#did-the-chain-converge-always-check",
+    "href": "weeks/week3-bayesian.html#did-the-chain-converge-always-check",
+    "title": "Week 3 — Bayesian Inference & Genomic Prediction",
+    "section": "4 4. Did the chain converge? Always check",
+    "text": "4 4. Did the chain converge? Always check\n\n\nCode\nvarE &lt;- scan(\"bglr_tmp/brr_varE.dat\", quiet = TRUE)\nplot(varE, type = \"l\", main = \"Trace: residual variance (BRR)\", ylab = \"varE\")\n\n\n\n\n\n\n\n\n\nCode\neffectiveSize(mcmc(varE))\n\n\n    var1 \n566.9967 \n\n\nA “fuzzy caterpillar” trace, effective sample size in the hundreds, and (with multiple chains) R-hat ≈ 1.00 — say these three things in an interview and you’ve answered the MCMC question."
+  },
+  {
+    "objectID": "weeks/week3-bayesian.html#where-the-models-disagree-marker-effects",
+    "href": "weeks/week3-bayesian.html#where-the-models-disagree-marker-effects",
+    "title": "Week 3 — Bayesian Inference & Genomic Prediction",
+    "section": "5 5. Where the models disagree: marker effects",
+    "text": "5 5. Where the models disagree: marker effects\n\n\nCode\ntibble(marker = 1:ncol(X),\n       BRR    = abs(fit_brr$ETA$mrk$b),\n       BayesB = abs(fit_bb$ETA$mrk$b)) |&gt;\n  pivot_longer(-marker) |&gt;\n  ggplot(aes(marker, value)) + geom_point(size = .4, alpha = .5) +\n  facet_wrap(~name) + theme_minimal() +\n  labs(y = \"|marker effect|\", title = \"Shrink-everything vs select-few priors\")\n\n\n\n\n\n\n\n\n\nBRR spreads small effects everywhere; BayesB concentrates signal — matching infinitesimal vs oligogenic architectures."
+  },
+  {
+    "objectID": "weeks/week3-bayesian.html#the-only-score-that-matters-predictive-ability",
+    "href": "weeks/week3-bayesian.html#the-only-score-that-matters-predictive-ability",
+    "title": "Week 3 — Bayesian Inference & Genomic Prediction",
+    "section": "6 6. The only score that matters: predictive ability",
+    "text": "6 6. The only score that matters: predictive ability\n\n\nCode\nset.seed(42)\nfolds &lt;- sample(rep(1:5, length.out = length(y)))\nacc &lt;- map_dfr(1:5, function(k) {\n  yNA &lt;- y; yNA[folds == k] &lt;- NA\n  f1 &lt;- BGLR(yNA, ETA = list(m = list(X = X, model = \"BRR\")),\n             nIter = 6000, burnIn = 1000, saveAt = \"bglr_tmp/cv1_\", verbose = FALSE)\n  f2 &lt;- BGLR(yNA, ETA = list(m = list(X = X, model = \"BayesB\")),\n             nIter = 6000, burnIn = 1000, saveAt = \"bglr_tmp/cv2_\", verbose = FALSE)\n  tibble(fold = k,\n         BRR    = cor(f1$yHat[folds == k], y[folds == k]),\n         BayesB = cor(f2$yHat[folds == k], y[folds == k]))\n})\n\n\n\n\nCode\nacc |&gt; summarise(across(BRR:BayesB, mean)) |&gt; round(3)\n\n\n# A tibble: 1 × 2\n    BRR BayesB\n  &lt;dbl&gt;  &lt;dbl&gt;\n1 0.526  0.518\n\n\nOn polygenic wheat yield the two typically tie — that result is the lesson: architecture determines the winner, so benchmark on your trait, don’t assume."
+  },
+  {
+    "objectID": "weeks/week3-bayesian.html#exercises",
+    "href": "weeks/week3-bayesian.html#exercises",
+    "title": "Week 3 — Bayesian Inference & Genomic Prediction",
+    "section": "7 Exercises",
+    "text": "7 Exercises\n\nAdd model = \"BL\" (Bayesian LASSO) to the CV loop.\nPredict environment 2 (wheat.Y[,2]) from models trained on environment 1 — what does the accuracy drop tell you about GxE?\nIncrease nIter to 30k for BayesB; do the top-10 markers change?\n\nData credit: Crossa et al. (2010) Genetics; distributed with BGLR (Pérez & de los Campos 2014)."
+  },
+  {
+    "objectID": "weeks/week5-multiomics.html",
+    "href": "weeks/week5-multiomics.html",
+    "title": "Week 5 — RNA-seq & Multi-Omics Integration",
+    "section": "",
+    "text": "flowchart LR\n    A[Counts → NB GLM&lt;br/&gt;DESeq2] --&gt; B[Multiple testing&lt;br/&gt;FDR]\n    B --&gt; C[WGCNA&lt;br/&gt;modules & eigengenes]\n    C --&gt; D[MOFA2&lt;br/&gt;factors across omics]\n    D --&gt; E[Biomarkers &&lt;br/&gt;interpretation]\nData: a downsampled real Brassica napus RNA-seq count matrix (via data/get_data.R, pulled from NCBI GEO) with a simulated-but-realistic methylation layer for the integration demo — swap in your own matrices with two lines."
+  },
+  {
+    "objectID": "weeks/week5-multiomics.html#why-counts-need-negative-binomial",
+    "href": "weeks/week5-multiomics.html#why-counts-need-negative-binomial",
+    "title": "Week 5 — RNA-seq & Multi-Omics Integration",
+    "section": "1 1. Why counts need negative binomial",
+    "text": "1 1. Why counts need negative binomial\nRNA-seq counts are overdispersed (variance &gt; mean): Poisson understates noise → false positives. DESeq2 models counts ~ NB, shrinks per-gene dispersions toward a trend (empirical Bayes — Week 3’s idea reappearing), and tests log-fold-changes with a Wald or LRT test. The design formula is Week 1’s linear model: ~ batch + condition.\n\n\nCode\nlibrary(DESeq2)\ncounts &lt;- readRDS(\"data/bnapus_counts.rds\")     # genes x samples\nmeta   &lt;- readRDS(\"data/bnapus_meta.rds\")       # condition, batch\ndds &lt;- DESeqDataSetFromMatrix(counts, meta, design = ~ batch + condition)\ndds &lt;- DESeq(dds)\nres &lt;- results(dds, alpha = 0.05)\nsummary(res)\n\n\n\n\nCode\n# Self-contained demo so the page always renders: simulate NB counts w/ signal\nlibrary(tidyverse)\nset.seed(9)\nn_g &lt;- 2000; de &lt;- 1:150\nmu  &lt;- rexp(n_g, 1/200)\ncts &lt;- sapply(1:6, \\(i) rnbinom(n_g, mu = mu * ifelse(i &gt; 3 & seq_len(n_g) %in% de, 2, 1), size = 3))\npv  &lt;- apply(cts, 1, \\(x) wilcox.test(x[1:3], x[4:6])$p.value)\npadj &lt;- p.adjust(pv, \"BH\")\ntibble(gene = 1:n_g, padj, truly_DE = gene %in% de) |&gt;\n  count(sig = padj &lt; .05, truly_DE)\n\n\n# A tibble: 3 × 3\n  sig   truly_DE     n\n  &lt;lgl&gt; &lt;lgl&gt;    &lt;int&gt;\n1 FALSE FALSE     1849\n2 FALSE TRUE       150\n3 NA    FALSE        1\n\n\nFDR (Benjamini–Hochberg) controls the proportion of false discoveries — with 20k genes, the right currency. Bonferroni controls any single false positive and is appropriate for GWAS-style confirmatory claims."
+  },
+  {
+    "objectID": "weeks/week5-multiomics.html#co-expression-wgcna-in-concept",
+    "href": "weeks/week5-multiomics.html#co-expression-wgcna-in-concept",
+    "title": "Week 5 — RNA-seq & Multi-Omics Integration",
+    "section": "2 2. Co-expression: WGCNA in concept",
+    "text": "2 2. Co-expression: WGCNA in concept\nCorrelation matrix → soft-threshold power (approximate scale-free topology) → topological overlap → hierarchical modules → module eigengene (first PC of the module) → correlate eigengenes with traits. It’s Week 2’s PCA working inside a network.\n\n\nCode\nlibrary(WGCNA)\nsft &lt;- pickSoftThreshold(t(vst_counts))\nnet &lt;- blockwiseModules(t(vst_counts), power = sft$powerEstimate, minModuleSize = 30)\nmoduleTraitCor &lt;- cor(net$MEs, traits)"
+  },
+  {
+    "objectID": "weeks/week5-multiomics.html#mofa2-one-factor-model-across-omics-layers",
+    "href": "weeks/week5-multiomics.html#mofa2-one-factor-model-across-omics-layers",
+    "title": "Week 5 — RNA-seq & Multi-Omics Integration",
+    "section": "3 3. MOFA2: one factor model across omics layers",
+    "text": "3 3. MOFA2: one factor model across omics layers\nMOFA2 = factor analysis across matched RNA-seq + methylation (+ genotype PAV) matrices: latent factors capture shared variation, with per-layer variance-explained telling you which omics drives which factor. Unsupervised, handles missing layers, the modern default.\n\n\nCode\nlibrary(MOFA2)\nmofa &lt;- create_mofa(list(RNA = rna_mat, Methylation = meth_mat))\nmofa &lt;- prepare_mofa(mofa, model_options = get_default_model_options(mofa))\nmofa &lt;- run_mofa(mofa, use_basilisk = TRUE)\nplot_variance_explained(mofa)\nplot_top_weights(mofa, view = \"RNA\", factor = 1, nfeatures = 15)\n\n\nSupervised counterpart: DIABLO (mixOmics::block.splsda) when you have groups to discriminate and want a cross-omics biomarker panel."
+  },
+  {
+    "objectID": "weeks/week5-multiomics.html#the-three-questions-to-ask-any-omics-analysis",
+    "href": "weeks/week5-multiomics.html#the-three-questions-to-ask-any-omics-analysis",
+    "title": "Week 5 — RNA-seq & Multi-Omics Integration",
+    "section": "4 4. The three questions to ask any omics analysis",
+    "text": "4 4. The three questions to ask any omics analysis\n\nIs the design confounded (batch ⟂ condition)? Check before modeling; fix with design terms or ComBat/RUV.\nIs the test matched to the distribution (NB for counts, logit-M for methylation proportions)?\nIs multiplicity controlled, and is FDR the right currency for the claim?"
+  },
+  {
+    "objectID": "weeks/week5-multiomics.html#exercises",
+    "href": "weeks/week5-multiomics.html#exercises",
+    "title": "Week 5 — RNA-seq & Multi-Omics Integration",
+    "section": "5 Exercises",
+    "text": "5 Exercises\n\nRun data/get_data.R to fetch the canola GEO matrix; repeat the DESeq2 block for real; volcano-plot the results.\nIn the simulation, raise replicates from 3→6 per group: how do power and the false-discovery count change?\nBuild a 2-layer MOFA on the provided matrices; which layer dominates Factor 1?\n\nCredits: DESeq2 (Love et al. 2014), WGCNA (Langfelder & Horvath 2008), MOFA2 (Argelaguet et al. 2020)."
+  },
+  {
+    "objectID": "weeks/week7-databases-apis.html",
+    "href": "weeks/week7-databases-apis.html",
+    "title": "Week 7 — Databases & APIs for Breeding Data",
+    "section": "",
+    "text": "flowchart LR\n    A[Relational model&lt;br/&gt;lines · markers · phenotypes] --&gt; B[SQLite&lt;br/&gt;create & load]\n    B --&gt; C[SQL verbs&lt;br/&gt;SELECT · JOIN · GROUP BY]\n    C --&gt; D[dbplyr&lt;br/&gt;dplyr → SQL]\n    D --&gt; E[plumber API&lt;br/&gt;GET /gwas?trait=...]"
+  },
+  {
+    "objectID": "weeks/week7-databases-apis.html#why-a-database-beats-40-csvs",
+    "href": "weeks/week7-databases-apis.html#why-a-database-beats-40-csvs",
+    "title": "Week 7 — Databases & APIs for Breeding Data",
+    "section": "1 1. Why a database beats 40 CSVs",
+    "text": "1 1. Why a database beats 40 CSVs\nOne authoritative copy, enforced types and keys, concurrent access, and queries that don’t require loading 2 GB into RAM. The mental model: one table per entity, keys linking them.\nlines(line_id, name, family, origin)\nphenotypes(line_id, trait, env, value)\ngwas_results(trait, marker, chr, pos, pvalue)"
+  },
+  {
+    "objectID": "weeks/week7-databases-apis.html#build-it-in-r-fully-reproducible",
+    "href": "weeks/week7-databases-apis.html#build-it-in-r-fully-reproducible",
+    "title": "Week 7 — Databases & APIs for Breeding Data",
+    "section": "2 2. Build it in R (fully reproducible)",
+    "text": "2 2. Build it in R (fully reproducible)\n\n\nCode\nlibrary(DBI); library(RSQLite); library(dplyr)\ncon &lt;- dbConnect(SQLite(), \"course.db\")\n\nset.seed(3)\nlines &lt;- tibble(line_id = 1:200, name = paste0(\"L\", 1:200),\n                family = sample(paste0(\"F\", 1:10), 200, TRUE))\nphenos &lt;- tidyr::expand_grid(line_id = 1:200, trait = c(\"Yield\",\"Oil\"),\n                             env = c(\"Saskatoon\",\"Melfort\")) |&gt;\n  mutate(value = rnorm(n(), 50, 8))\ndbWriteTable(con, \"lines\", lines, overwrite = TRUE)\ndbWriteTable(con, \"phenotypes\", phenos, overwrite = TRUE)\ndbListTables(con)\n\n\n[1] \"lines\"      \"phenotypes\""
+  },
+  {
+    "objectID": "weeks/week7-databases-apis.html#sql-youll-actually-write",
+    "href": "weeks/week7-databases-apis.html#sql-youll-actually-write",
+    "title": "Week 7 — Databases & APIs for Breeding Data",
+    "section": "3 3. SQL you’ll actually write",
+    "text": "3 3. SQL you’ll actually write\n\n\nCode\ndbGetQuery(con, \"\n  SELECT l.family, p.trait, ROUND(AVG(p.value),1) AS mean_val, COUNT(*) AS n\n  FROM phenotypes p JOIN lines l USING(line_id)\n  WHERE p.env = 'Saskatoon'\n  GROUP BY l.family, p.trait\n  ORDER BY mean_val DESC LIMIT 6\")\n\n\n  family trait mean_val  n\n1     F4 Yield     54.7 20\n2     F3   Oil     51.9 19\n3     F5   Oil     51.9 18\n4     F9   Oil     51.9 20\n5     F1   Oil     51.7 15\n6    F10   Oil     51.0 27"
+  },
+  {
+    "objectID": "weeks/week7-databases-apis.html#or-let-dbplyr-write-the-sql",
+    "href": "weeks/week7-databases-apis.html#or-let-dbplyr-write-the-sql",
+    "title": "Week 7 — Databases & APIs for Breeding Data",
+    "section": "4 4. Or let dbplyr write the SQL",
+    "text": "4 4. Or let dbplyr write the SQL\n\n\nCode\ntbl(con, \"phenotypes\") |&gt;\n  left_join(tbl(con, \"lines\"), by = \"line_id\") |&gt;\n  group_by(family, trait) |&gt;\n  summarise(mean_val = mean(value), .groups = \"drop\") |&gt;\n  show_query()\n\n\n&lt;SQL&gt;\nSELECT `family`, `trait`, AVG(`value`) AS `mean_val`\nFROM (\n  SELECT `phenotypes`.*, `name`, `family`\n  FROM `phenotypes`\n  LEFT JOIN `lines`\n    ON (`phenotypes`.`line_id` = `lines`.`line_id`)\n) AS `q01`\nGROUP BY `family`, `trait`\n\n\nSame dplyr verbs as Week 0b — translated to SQL and executed in the database."
+  },
+  {
+    "objectID": "weeks/week7-databases-apis.html#serve-it-a-rest-api-in-20-lines",
+    "href": "weeks/week7-databases-apis.html#serve-it-a-rest-api-in-20-lines",
+    "title": "Week 7 — Databases & APIs for Breeding Data",
+    "section": "5 5. Serve it: a REST API in 20 lines",
+    "text": "5 5. Serve it: a REST API in 20 lines\napi/plumber.R:\n\n\nCode\nlibrary(plumber); library(DBI); library(RSQLite)\n\n#* @apiTitle Breeding data API — Sampath Perumal\n\n#* Mean phenotype by family\n#* @param trait Trait name\n#* @get /summary\nfunction(trait = \"Yield\") {\n  con &lt;- dbConnect(SQLite(), \"course.db\"); on.exit(dbDisconnect(con))\n  dbGetQuery(con, \"SELECT l.family, AVG(p.value) AS mean_val\n                   FROM phenotypes p JOIN lines l USING(line_id)\n                   WHERE p.trait = ? GROUP BY l.family\", params = list(trait))\n}\n\n\nRun: plumber::plumb(\"api/plumber.R\")$run(port = 8000) → http://localhost:8000/summary?trait=Oil returns JSON. Your Week 6 Shiny app, a Python script, and a collaborator’s browser all consume the same endpoint — that’s the architecture sentence worth saying in interviews."
+  },
+  {
+    "objectID": "weeks/week7-databases-apis.html#exercises",
+    "href": "weeks/week7-databases-apis.html#exercises",
+    "title": "Week 7 — Databases & APIs for Breeding Data",
+    "section": "6 Exercises",
+    "text": "6 Exercises\n\nAdd a gwas_results table from Week 3/4 output; write a query returning the top 10 markers per trait (window function: ROW_NUMBER() OVER (PARTITION BY trait ORDER BY pvalue)).\nAdd a /gwas endpoint with a p-value filter parameter.\nPoint the Week 6 app at the database via pool + DBI instead of RDS files."
+  }
+]
